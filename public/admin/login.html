@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradePlug255 Admin — Login</title>
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin-page">
+  <main class="admin-login-wrap">
+    <section class="admin-login-card">
+      <img src="/images/logo.svg" alt="" width="56" height="56">
+      <h1>TradePlug255 Admin</h1>
+      <p>Sign in to manage products, prices, descriptions, and images.</p>
+      <form id="loginForm">
+        <label class="field">
+          <span class="field__label">Admin password</span>
+          <input id="passwordInput" type="password" autocomplete="current-password" required>
+        </label>
+        <button id="togglePasswordBtn" class="btn btn--ghost btn--block" type="button" aria-pressed="false">
+          Show password
+        </button>
+        <button id="submitBtn" class="btn btn--primary btn--block" type="submit">Sign in</button>
+      </form>
+      <p id="status" class="admin-status"></p>
+      <a href="/" class="admin-back">← Back to store</a>
+    </section>
+  </main>
+  <script src="/admin/login.js" defer></script>
+</body>
+</html>

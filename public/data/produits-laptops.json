@@ -1,0 +1,29 @@
+[
+  {
+    "id": "tp-lap-001",
+    "name": "MacBook Pro 14\" M3 Pro",
+    "description": "18GB RAM, 512GB SSD. Perfect for video editing and development.",
+    "price": 4200000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-lap-002",
+    "name": "Dell XPS 15 OLED",
+    "description": "Intel Core i7, 16GB RAM, sharp 3.5K OLED display.",
+    "price": 3100000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-lap-003",
+    "name": "ASUS ROG Zephyrus G14",
+    "description": "Portable gaming powerhouse with RTX 4060 and 165Hz screen.",
+    "price": 3450000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  }
+]

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradePlug255 Admin</title>
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin-page">
+  <header class="admin-topbar">
+    <div class="container admin-topbar__inner">
+      <div class="admin-brand">
+        <img src="/images/logo.svg" alt="" width="40" height="40">
+        <div>
+          <strong>TradePlug255 Admin</strong>
+          <p>Manage products and images</p>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <a href="/" class="btn btn--ghost">Open store</a>
+        <button id="logoutBtn" class="btn btn--outline" type="button">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container admin-main">
+    <section class="panel admin-panel">
+      <div class="panel__head">
+        <h2>Product form</h2>
+        <p>Add a new product or edit an existing one.</p>
+      </div>
+      <form id="productForm" class="admin-form" enctype="multipart/form-data">
+        <input id="productId" name="id" type="hidden">
+        <div class="admin-grid">
+          <label class="field">
+            <span class="field__label">Category</span>
+            <select id="segmentInput" name="segment" required>
+              <option value="telephones">Phones</option>
+              <option value="laptops">Laptops</option>
+              <option value="jeux-video">Video Games</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field__label">Condition</span>
+            <input id="conditionInput" name="condition" placeholder="New / Used" required>
+          </label>
+          <label class="field admin-grid__full">
+            <span class="field__label">Product name</span>
+            <input id="nameInput" name="name" required>
+          </label>
+          <label class="field admin-grid__full">
+            <span class="field__label">Description</span>
+            <textarea id="descriptionInput" name="description" rows="4" required></textarea>
+          </label>
+          <label class="field">
+            <span class="field__label">Price (TZS)</span>
+            <input id="priceInput" name="price" type="number" min="0" step="1000" required>
+          </label>
+          <label class="field">
+            <span class="field__label">Upload images</span>
+            <input id="imagesInput" name="images" type="file" accept="image/*" multiple>
+          </label>
+        </div>
+        <div id="currentImages" class="admin-images"></div>
+        <div class="admin-form__actions">
+          <button class="btn btn--primary" type="submit">Save product</button>
+          <button id="resetBtn" class="btn btn--ghost" type="button">Reset form</button>
+        </div>
+      </form>
+      <p id="status" class="admin-status"></p>
+    </section>
+
+    <section class="panel admin-panel">
+      <div class="panel__head">
+        <h2>Catalog list</h2>
+        <p>Select a category to browse and edit products.</p>
+      </div>
+      <div class="admin-list-tools">
+        <label class="field" style="max-width:260px">
+          <span class="field__label">Category</span>
+          <select id="listSegmentInput">
+            <option value="telephones">Phones</option>
+            <option value="laptops">Laptops</option>
+            <option value="jeux-video">Video Games</option>
+          </select>
+        </label>
+        <button id="refreshBtn" class="btn btn--outline" type="button">Refresh</button>
+      </div>
+      <div id="productTableWrap" class="admin-table-wrap"></div>
+    </section>
+  </main>
+
+  <script src="/admin/admin.js" defer></script>
+</body>
+</html>

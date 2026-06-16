@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradePlug255 — Catalog</title>
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="page-catalog" data-segment="jeux-video">
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="/" aria-label="Back to home">
+        <img src="/images/logo.svg" alt="" class="brand__logo" width="48" height="48">
+        <div class="brand__text">
+          <span class="brand__name">TradePlug255</span>
+          <span class="brand__tagline" data-page-tagline>Catalog</span>
+        </div>
+      </a>
+      <nav class="site-nav" aria-label="Navigation">
+        <a href="/">Home</a>
+        <a href="/telephones/">Phones</a>
+        <a href="/laptops/">Laptops</a>
+        <a href="/jeux-video/">Video Games</a>
+        <a href="#orderPanel">Mes infos</a>
+        <button type="button" id="cartToggleBtn" class="site-nav__cart" aria-label="Open cart">
+          Cart <span id="cartCount" class="cart-count" hidden>0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <p class="hero__eyebrow">TradePlug255</p>
+      <h1 data-page-title>Catalog</h1>
+      <p class="hero__lead" data-page-lead>Loading products...</p>
+    </div>
+  </section>
+
+  <main class="container main">
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Catalog</h2>
+        <p>Filter products, add to cart, and order directly on WhatsApp.</p>
+      </div>
+      <div class="filters-grid">
+        <label class="field">
+          <span class="field__label">Search</span>
+          <input id="searchInput" type="search" placeholder="Search products...">
+        </label>
+        <label class="field">
+          <span class="field__label">Max price (TZS)</span>
+          <input id="maxPriceInput" type="number" min="0" step="10000">
+        </label>
+        <label class="field">
+          <span class="field__label">Sort</span>
+          <select id="sortPriceInput">
+            <option value="none">Default</option>
+            <option value="asc">Price: low to high</option>
+            <option value="desc">Price: high to low</option>
+          </select>
+        </label>
+        <div class="filters-grid__actions">
+          <button id="resetFiltersBtn" type="button" class="btn btn--outline">Reset filters</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="productList" class="product-grid" aria-live="polite"></div>
+
+    <section class="panel" id="orderPanel">
+      <div class="panel__head">
+        <h2>Vos informations</h2>
+        <p class="order-panel__hint">
+          Les appareils viennent de Chine pour la Tanzanie. Livraison possible en moins d'une semaine (selon disponibilité et destination).
+        </p>
+      </div>
+      <form id="orderForm" class="order-form" novalidate>
+        <div class="order-form-grid">
+          <label class="field">
+            <span class="field__label">Nom</span>
+            <input id="orderNameInput" name="name" type="text" autocomplete="name" placeholder="Votre nom">
+          </label>
+          <label class="field">
+            <span class="field__label">WhatsApp</span>
+            <input id="orderPhoneInput" name="phone" type="tel" autocomplete="tel" placeholder="Votre numéro WhatsApp">
+          </label>
+          <label class="field">
+            <span class="field__label">Ville</span>
+            <input id="orderCityInput" name="city" type="text" placeholder="Ville">
+          </label>
+          <label class="field">
+            <span class="field__label">Adresse</span>
+            <input id="orderAddressInput" name="address" type="text" placeholder="Adresse (quartier, repère)">
+          </label>
+          <label class="field order-form-grid__full">
+            <span class="field__label">Notes</span>
+            <textarea id="orderNotesInput" name="notes" rows="2" placeholder="Couleur, modèle, détail, etc."></textarea>
+          </label>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <div class="site-footer__brand">
+        <img src="/images/logo.svg" alt="" width="36" height="36">
+        <span>TradePlug255</span>
+      </div>
+      <p class="site-footer__copy">
+        WhatsApp: <a href="https://wa.me/25574879462">+255 748 794 62</a>
+      </p>
+    </div>
+  </footer>
+
+  <div id="cartDrawer" class="cart-drawer" hidden>
+    <div id="cartBackdrop" class="cart-drawer__backdrop"></div>
+    <aside class="cart-drawer__panel" aria-label="Cart drawer">
+      <div class="cart-drawer__head">
+        <h2>Your cart</h2>
+        <button type="button" id="cartCloseBtn" class="cart-drawer__close" aria-label="Close cart">×</button>
+      </div>
+      <div id="cartList" class="cart-drawer__list"></div>
+      <div class="cart-drawer__foot">
+        <div class="cart-drawer__total"><span>Total</span><span id="cartTotal">0 TZS</span></div>
+        <button type="button" id="cartCheckoutBtn" class="btn btn--whatsapp btn--block">Checkout on WhatsApp</button>
+        <button type="button" id="cartClearBtn" class="btn btn--ghost btn--block">Clear cart</button>
+      </div>
+    </aside>
+  </div>
+
+  <a href="#" id="waFloat" class="wa-float" aria-label="WhatsApp">💬</a>
+  <div id="statusToast" class="status-toast" role="status"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

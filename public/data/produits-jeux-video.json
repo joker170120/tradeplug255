@@ -1,0 +1,38 @@
+[
+  {
+    "id": "tp-game-001",
+    "name": "PlayStation 5 Slim + 2 Controllers",
+    "description": "PS5 Slim console bundle with two DualSense controllers.",
+    "price": 1850000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-game-002",
+    "name": "Xbox Series X 1TB",
+    "description": "4K 120fps gaming, backward compatibility, Game Pass ready.",
+    "price": 1750000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-game-003",
+    "name": "Nintendo Switch OLED",
+    "description": "7-inch OLED display, portable and TV modes included.",
+    "price": 980000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-game-004",
+    "name": "EA FC 25 — PS5",
+    "description": "Standard edition for PlayStation 5.",
+    "price": 120000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  }
+]

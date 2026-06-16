@@ -1,0 +1,29 @@
+[
+  {
+    "id": "tp-phone-001",
+    "name": "iPhone 15 Pro Max 256GB",
+    "description": "Brand new, warranty included. Super Retina display, A17 Pro chip.",
+    "price": 2850000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-phone-002",
+    "name": "Samsung Galaxy S24 Ultra",
+    "description": "S Pen included, 200MP camera, long-lasting battery.",
+    "price": 2650000,
+    "currencySymbol": "TZS",
+    "condition": "New",
+    "images": []
+  },
+  {
+    "id": "tp-phone-003",
+    "name": "Google Pixel 8 Pro",
+    "description": "Excellent camera AI and clean Android experience.",
+    "price": 1950000,
+    "currencySymbol": "TZS",
+    "condition": "Used — Excellent",
+    "images": []
+  }
+]
