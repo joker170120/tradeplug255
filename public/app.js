@@ -4,26 +4,49 @@
 const SEGMENTS = {
   telephones: {
     title: "Phones",
-    tagline: "Smartphones & tablets",
-    lead: "iPhone, Samsung, Pixel and more — brand new or certified used.",
+    tagline: "Smartphones",
+    lead: "iPhone, Samsung, Pixel and more — new or certified refurbished.",
     api: "/api/products/telephones",
     emoji: "📱"
   },
   laptops: {
     title: "Laptops",
     tagline: "Portable computers",
-    lead: "MacBook, gaming and office laptops — performance with style.",
+    lead: "MacBook, office and gaming laptops — performance with style.",
     api: "/api/products/laptops",
     emoji: "💻"
   },
+  tablettes: {
+    title: "iPad & Tablets",
+    tagline: "Tablets",
+    lead: "iPad, Samsung Tab and related accessories.",
+    api: "/api/products/tablettes",
+    emoji: "📲"
+  },
   "jeux-video": {
-    title: "Video Games",
+    title: "Gaming",
     tagline: "Consoles & games",
     lead: "PlayStation, Xbox, Nintendo and top games at the best price.",
     api: "/api/products/jeux-video",
     emoji: "🎮"
+  },
+  accessoires: {
+    title: "Accessories",
+    tagline: "Audio & protection",
+    lead: "Earbuds, chargers, cases and more.",
+    api: "/api/products/accessoires",
+    emoji: "🎧"
+  },
+  restreints: {
+    title: "Restricted products (+18)",
+    tagline: "Adults only",
+    lead: "Category reserved for people aged 18 and over.",
+    api: "/api/products/restreints",
+    emoji: "🔞"
   }
 };
+
+const AGE_GATE_KEY = "tradeplug255-age-verified";
 
 const CART_KEY = "tradeplug255-cart-v1";
 const NO_IMAGE =
@@ -39,11 +62,17 @@ let site = {
 };
 let products = [];
 let cart = [];
+let currentUser = null;
 
 const body = document.body;
 const isHub = body.classList.contains("page-hub");
+const isProduits = body.classList.contains("page-produits");
+const isPremium = body.classList.contains("page-premium");
+const isContact = body.classList.contains("page-contact");
+const isProfile = body.classList.contains("page-profile");
 const segmentKey = body.dataset.segment || "";
 const segment = SEGMENTS[segmentKey] || null;
+const requiresAge = body.dataset.requireAge === "true";
 
 const productListEl = document.getElementById("productList");
 const searchInputEl = document.getElementById("searchInput");
@@ -61,6 +90,9 @@ const cartCheckoutBtnEl = document.getElementById("cartCheckoutBtn");
 const cartClearBtnEl = document.getElementById("cartClearBtn");
 const cartToggleBtnEl = document.getElementById("cartToggleBtn");
 const waFloatEl = document.getElementById("waFloat");
+const ageGateModalEl = document.getElementById("ageGateModal");
+const ageGateYesEl = document.getElementById("ageGateYes");
+const ageGateNoEl = document.getElementById("ageGateNo");
 
 // Optional order form fields (present on catalog pages).
 const orderNameInputEl = document.getElementById("orderNameInput");
@@ -103,6 +135,122 @@ async function fetchJson(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json();
+}
+
+async function postJson(url, payload) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload ?? {})
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+async function refreshAuth() {
+  try {
+    const data = await fetchJson("/api/auth/me");
+    currentUser = data.authed ? data.user : null;
+  } catch {
+    currentUser = null;
+  }
+  return currentUser;
+}
+
+function getRedirectUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get("redirect");
+  if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+    return redirect;
+  }
+  return null;
+}
+
+async function requireLoginForCheckout() {
+  if (!currentUser) await refreshAuth();
+  if (currentUser) return true;
+  const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+  window.location.href = `/profile/?redirect=${redirect}`;
+  return false;
+}
+
+async function createPendingOrder(items, orderInfo, segment) {
+  return postJson("/api/orders", { items, orderInfo, segment });
+}
+
+function orderItemsFromCart() {
+  return cart.map((item) => ({
+    id: item.id,
+    name: item.name,
+    price: item.price,
+    qty: item.qty,
+    currencySymbol: item.currencySymbol || site.currencySymbol
+  }));
+}
+
+function orderItemsFromProduct(product) {
+  return [{
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    qty: 1,
+    currencySymbol: product.currencySymbol || site.currencySymbol
+  }];
+}
+
+async function reserveAndOpenWhatsApp(items, orderInfo, message, segment) {
+  if (!(await requireLoginForCheckout())) return;
+  await createPendingOrder(items, orderInfo, segment || segmentKey || "");
+  openWhatsApp(message);
+  setStatus("Reservation saved. Confirm your purchase in My account after WhatsApp.", true);
+}
+
+async function handleCartCheckout() {
+  if (!cart.length) {
+    setStatus("Your cart is empty.", false);
+    return;
+  }
+  const orderInfo = getOrderInfo();
+  const message = buildCartWhatsAppMessage(orderInfo);
+  try {
+    await reserveAndOpenWhatsApp(orderItemsFromCart(), orderInfo, message, segmentKey);
+    cart = [];
+    saveCart();
+    closeCartDrawer();
+  } catch (err) {
+    setStatus(err.message || "Could not save reservation.", false);
+  }
+}
+
+async function handleProductOrder(product) {
+  const orderInfo = getOrderInfo();
+  const message = buildProductWhatsAppMessage(product, orderInfo);
+  try {
+    await reserveAndOpenWhatsApp(orderItemsFromProduct(product), orderInfo, message, segmentKey);
+  } catch (err) {
+    setStatus(err.message || "Could not save reservation.", false);
+  }
+}
+
+function injectProfileLink() {
+  const foot = document.querySelector(".cart-drawer__foot");
+  if (!foot || foot.querySelector("[data-profile-link]")) return;
+  const link = document.createElement("a");
+  link.href = "/profile/";
+  link.className = "btn btn--ghost btn--block profile-cart-link";
+  link.setAttribute("data-profile-link", "true");
+  link.textContent = currentUser ? "My account" : "Sign in / My account";
+  foot.insertBefore(link, foot.firstChild);
+}
+
+function updateProfileLink() {
+  const link = document.querySelector("[data-profile-link]");
+  if (link) {
+    link.textContent = currentUser ? "My account" : "Sign in / My account";
+  } else {
+    injectProfileLink();
+  }
 }
 
 function loadCart() {
@@ -184,6 +332,7 @@ function paintCartUi() {
   }
 
   if (cartTotalEl) cartTotalEl.textContent = formatPrice(total);
+  updateProfileLink();
 
   cartListEl.querySelectorAll("[data-cart-minus]").forEach((btn) => {
     btn.addEventListener("click", () => changeQty(btn.getAttribute("data-cart-minus"), -1));
@@ -228,19 +377,19 @@ function getOrderInfo() {
 function appendShippingAndOrderInfo(lines, orderInfo) {
   lines.push(
     "",
-    "Les appareils viennent de Chine pour la Tanzanie.",
-    "Livraison possible en moins d'une semaine (selon disponibilité et destination)."
+    "Products ship from China to Tanzania.",
+    "Delivery possible in under one week (subject to availability and destination)."
   );
 
   const infoLines = [];
-  if (orderInfo?.name) infoLines.push(`Nom: ${orderInfo.name}`);
+  if (orderInfo?.name) infoLines.push(`Name: ${orderInfo.name}`);
   if (orderInfo?.phone) infoLines.push(`WhatsApp: ${orderInfo.phone}`);
-  if (orderInfo?.city) infoLines.push(`Ville: ${orderInfo.city}`);
-  if (orderInfo?.address) infoLines.push(`Adresse: ${orderInfo.address}`);
+  if (orderInfo?.city) infoLines.push(`City: ${orderInfo.city}`);
+  if (orderInfo?.address) infoLines.push(`Address: ${orderInfo.address}`);
   if (orderInfo?.notes) infoLines.push(`Notes: ${orderInfo.notes}`);
 
   if (infoLines.length) {
-    lines.push("", "*Vos informations:*");
+    lines.push("", "*Your details:*");
     for (const line of infoLines) lines.push(`• ${line}`);
   }
 }
@@ -351,7 +500,7 @@ function renderProducts() {
   productListEl.querySelectorAll("[data-order-wa]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const product = products.find((entry) => entry.id === btn.getAttribute("data-order-wa"));
-      if (product) openWhatsApp(buildProductWhatsAppMessage(product, getOrderInfo()));
+      if (product) handleProductOrder(product);
     });
   });
 }
@@ -382,11 +531,7 @@ function bindUi() {
   });
 
   cartCheckoutBtnEl?.addEventListener("click", () => {
-    if (!cart.length) {
-      setStatus("Your cart is empty.", false);
-      return;
-    }
-    openWhatsApp(buildCartWhatsAppMessage(getOrderInfo()));
+    handleCartCheckout();
   });
 
   waFloatEl?.addEventListener("click", (e) => {
@@ -405,9 +550,332 @@ function bindUi() {
 async function initHub() {
   const siteData = await fetchJson("/data/site.json");
   site = { ...site, ...siteData };
-  document.title = `${site.shopName} — Premium tech store`;
+  document.title = `${site.shopName} — The Prestige`;
   const brandName = document.querySelector(".brand__name");
   if (brandName) brandName.textContent = site.shopName;
+  applySocialLinks("homeSocialLinks", site.social);
+}
+
+function applySocialLinks(containerId, social) {
+  const container = document.getElementById(containerId);
+  if (!container || !social) return;
+  const map = {
+    whatsapp: social.whatsapp,
+    instagram: social.instagram,
+    tiktok: social.tiktok,
+    facebook: social.facebook,
+    youtube: social.youtube,
+    linkedin: social.linkedin
+  };
+  container.querySelectorAll("a.social-links__btn").forEach((link) => {
+    const cls = [...link.classList].find((c) => c.startsWith("social-links__btn--"));
+    if (!cls) return;
+    const key = cls.replace("social-links__btn--", "");
+    const keyMap = { wa: "whatsapp", ig: "instagram", tt: "tiktok", fb: "facebook", yt: "youtube", li: "linkedin" };
+    const url = map[keyMap[key] || key];
+    if (url) link.href = url;
+    else if (key !== "wa") link.style.display = "none";
+  });
+}
+
+async function initContact() {
+  const siteData = await fetchJson("/data/site.json");
+  site = { ...site, ...siteData };
+  document.title = `${site.shopName} — Contact`;
+
+  const phoneEl = document.getElementById("contactPhone");
+  if (phoneEl) {
+    phoneEl.innerHTML = `<a href="tel:${toDigits(site.phone || site.whatsappSeller)}">${escapeHtml(site.phone || site.whatsappSeller)}</a>`;
+  }
+  const waEl = document.getElementById("contactWhatsApp");
+  if (waEl) {
+    const waUrl = site.social?.whatsapp || `https://wa.me/${toDigits(site.whatsappSeller)}`;
+    waEl.innerHTML = `<a href="${escapeHtml(waUrl)}" target="_blank" rel="noopener">Open WhatsApp</a>`;
+  }
+  const emailEl = document.getElementById("contactEmail");
+  if (emailEl && site.email) {
+    emailEl.innerHTML = `<a href="mailto:${escapeHtml(site.email)}">${escapeHtml(site.email)}</a>`;
+  }
+  const locEl = document.getElementById("contactLocation");
+  if (locEl && site.location) locEl.textContent = site.location;
+
+  applySocialLinks("contactSocialLinks", site.social);
+  const social = site.social || {};
+  if (social.youtube) {
+    const ytBtn = document.querySelector("#contactSocialLinks .social-links__btn--disabled[title*='YouTube']");
+    if (ytBtn) {
+      ytBtn.outerHTML = `<a href="${escapeHtml(social.youtube)}" class="social-links__btn social-links__btn--yt" target="_blank" rel="noopener">YouTube</a>`;
+    }
+  }
+  if (social.linkedin) {
+    const liBtn = document.querySelector("#contactSocialLinks .social-links__btn--disabled[title*='LinkedIn']");
+    if (liBtn) {
+      liBtn.outerHTML = `<a href="${escapeHtml(social.linkedin)}" class="social-links__btn social-links__btn--li" target="_blank" rel="noopener">LinkedIn</a>`;
+    }
+  }
+}
+
+async function initPremium() {
+  const siteData = await fetchJson("/data/site.json");
+  site = { ...site, ...siteData };
+  document.title = `${site.shopName} — Premium`;
+
+  const tbody = document.getElementById("premiumTableBody");
+  if (!tbody) return;
+  const suppliers = Array.isArray(siteData.premiumSuppliers) ? siteData.premiumSuppliers : [];
+  if (!suppliers.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">No suppliers yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = suppliers
+    .map(
+      (s) => `<tr>
+        <td><strong>${escapeHtml(s.name)}</strong></td>
+        <td>${escapeHtml(s.location)}</td>
+        <td>${escapeHtml(s.category)}</td>
+        <td>${s.verified ? '<span class="badge badge--verified">Verified</span>' : '<span class="badge badge--pending">Pending</span>'}</td>
+        <td>${escapeHtml(s.contact)}</td>
+        <td>${escapeHtml(s.moq)}</td>
+        <td>${escapeHtml(s.notes)}</td>
+      </tr>`
+    )
+    .join("");
+}
+
+function isAgeVerified() {
+  try {
+    return localStorage.getItem(AGE_GATE_KEY) === "yes";
+  } catch {
+    return false;
+  }
+}
+
+function setAgeVerified() {
+  try {
+    localStorage.setItem(AGE_GATE_KEY, "yes");
+  } catch {
+    /* ignore */
+  }
+}
+
+function showAgeGate() {
+  if (!ageGateModalEl) return;
+  ageGateModalEl.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function hideAgeGate() {
+  if (!ageGateModalEl) return;
+  ageGateModalEl.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function bindAgeGate() {
+  let pendingAgeHref = null;
+
+  if (requiresAge && !isAgeVerified()) {
+    showAgeGate();
+    document.querySelector("main")?.setAttribute("hidden", "");
+  }
+
+  ageGateYesEl?.addEventListener("click", () => {
+    setAgeVerified();
+    hideAgeGate();
+    document.querySelector("main")?.removeAttribute("hidden");
+    if (pendingAgeHref) {
+      window.location.href = pendingAgeHref;
+      pendingAgeHref = null;
+    }
+  });
+
+  ageGateNoEl?.addEventListener("click", () => {
+    window.location.href = "/produits/";
+  });
+
+  document.querySelectorAll("[data-age-gate-link]").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      if (isAgeVerified()) return;
+      e.preventDefault();
+      pendingAgeHref = link.getAttribute("href");
+      showAgeGate();
+    });
+  });
+}
+
+function formatOrderDate(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
+  } catch {
+    return value;
+  }
+}
+
+function renderOrderCard(order, { showConfirm = false } = {}) {
+  const itemsHtml = (order.items || [])
+    .map(
+      (item) =>
+        `<li>${escapeHtml(item.name)} × ${item.qty} — ${formatPrice(item.price * item.qty, item.currencySymbol)}</li>`
+    )
+    .join("");
+  const info = order.orderInfo || {};
+  const details = [
+    info.name ? `Name: ${escapeHtml(info.name)}` : "",
+    info.phone ? `WhatsApp: ${escapeHtml(info.phone)}` : "",
+    info.city ? `City: ${escapeHtml(info.city)}` : "",
+    info.address ? `Address: ${escapeHtml(info.address)}` : "",
+    info.notes ? `Notes: ${escapeHtml(info.notes)}` : ""
+  ].filter(Boolean);
+
+  return `
+    <article class="order-card">
+      <div class="order-card__head">
+        <div>
+          <p class="order-card__date">${formatOrderDate(order.createdAt)}</p>
+          <p class="order-card__total">Total: ${formatPrice(order.total, order.currencySymbol)}</p>
+        </div>
+        <span class="order-card__status order-card__status--${escapeHtml(order.status)}">${escapeHtml(order.status)}</span>
+      </div>
+      <ul class="order-card__items">${itemsHtml}</ul>
+      ${details.length ? `<div class="order-card__details">${details.map((line) => `<p>${line}</p>`).join("")}</div>` : ""}
+      ${
+        showConfirm
+          ? `<button type="button" class="btn btn--primary btn--block" data-confirm-order="${escapeHtml(order.id)}">Confirm my purchase</button>`
+          : ""
+      }
+    </article>`;
+}
+
+function paintOrdersList(container, orders, emptyText, showConfirm) {
+  if (!container) return;
+  if (!orders.length) {
+    container.innerHTML = `<p class="empty-state">${escapeHtml(emptyText)}</p>`;
+    return;
+  }
+  container.innerHTML = orders.map((order) => renderOrderCard(order, { showConfirm })).join("");
+  if (showConfirm) {
+    container.querySelectorAll("[data-confirm-order]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const orderId = btn.getAttribute("data-confirm-order");
+        btn.disabled = true;
+        try {
+          await postJson(`/api/orders/${orderId}/confirm`, {});
+          setStatus("Purchase confirmed and added to your history.", true);
+          await loadProfileOrders();
+        } catch (err) {
+          setStatus(err.message || "Could not confirm order.", false);
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+}
+
+async function loadProfileOrders() {
+  const [pendingData, historyData] = await Promise.all([
+    fetchJson("/api/orders/pending"),
+    fetchJson("/api/orders/history")
+  ]);
+  paintOrdersList(
+    document.getElementById("pendingOrdersList"),
+    pendingData.orders || [],
+    "No pending orders.",
+    true
+  );
+  paintOrdersList(
+    document.getElementById("historyOrdersList"),
+    historyData.orders || [],
+    "No confirmed orders yet.",
+    false
+  );
+}
+
+function showProfileGuest() {
+  document.getElementById("profileGuest")?.removeAttribute("hidden");
+  document.getElementById("profileAuthed")?.setAttribute("hidden", "");
+}
+
+function showProfileAuthed(user) {
+  document.getElementById("profileGuest")?.setAttribute("hidden", "");
+  const authed = document.getElementById("profileAuthed");
+  authed?.removeAttribute("hidden");
+  const nameEl = document.getElementById("profileUserName");
+  const emailEl = document.getElementById("profileUserEmail");
+  if (nameEl) nameEl.textContent = user?.name || "—";
+  if (emailEl) emailEl.textContent = user?.email || "—";
+}
+
+async function initProfile() {
+  const siteData = await fetchJson("/data/site.json");
+  site = { ...site, ...siteData };
+  document.title = `${site.shopName} — My account`;
+
+  const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  loginForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const data = await postJson("/api/auth/login", {
+        email: document.getElementById("loginEmail")?.value,
+        password: document.getElementById("loginPassword")?.value
+      });
+      currentUser = data.user;
+      showProfileAuthed(currentUser);
+      await loadProfileOrders();
+      setStatus("Signed in successfully.", true);
+      const redirect = getRedirectUrl();
+      if (redirect) window.location.href = redirect;
+    } catch (err) {
+      setStatus(err.message || "Sign in failed.", false);
+    }
+  });
+
+  registerForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const data = await postJson("/api/auth/register", {
+        name: document.getElementById("registerName")?.value,
+        email: document.getElementById("registerEmail")?.value,
+        password: document.getElementById("registerPassword")?.value
+      });
+      currentUser = data.user;
+      showProfileAuthed(currentUser);
+      await loadProfileOrders();
+      setStatus("Account created successfully.", true);
+      const redirect = getRedirectUrl();
+      if (redirect) window.location.href = redirect;
+    } catch (err) {
+      setStatus(err.message || "Registration failed.", false);
+    }
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    try {
+      await postJson("/api/auth/logout", {});
+      currentUser = null;
+      showProfileGuest();
+      setStatus("Signed out.", true);
+    } catch (err) {
+      setStatus(err.message || "Could not sign out.", false);
+    }
+  });
+
+  await refreshAuth();
+  if (currentUser) {
+    showProfileAuthed(currentUser);
+    await loadProfileOrders();
+  } else {
+    showProfileGuest();
+  }
+}
+
+function initProduits() {
+  bindAgeGate();
 }
 
 async function initCatalog() {
@@ -432,7 +900,16 @@ async function initCatalog() {
 
 loadCart();
 bindUi();
+bindAgeGate();
+injectProfileLink();
+refreshAuth().then(() => updateProfileLink());
 paintCartUi();
 
-const boot = isHub ? initHub() : initCatalog();
+let boot;
+if (isHub) boot = initHub();
+else if (isPremium) boot = initPremium();
+else if (isContact) boot = initContact();
+else if (isProfile) boot = initProfile();
+else if (isProduits) boot = Promise.resolve(initProduits());
+else boot = initCatalog();
 boot.catch((err) => setStatus(err.message || "Loading error", false));

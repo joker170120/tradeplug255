@@ -3,5 +3,54 @@
   "currency": "TZS",
   "currencySymbol": "TZS",
   "whatsappSeller": "+25574879462",
-  "tagline": "Premium tech · Tanzania"
+  "phone": "+255 748 794 62",
+  "email": "contact@tradeplug255.com",
+  "location": "Dar es Salaam, Tanzania",
+  "tagline": "The Prestige",
+  "social": {
+    "whatsapp": "https://wa.me/25574879462",
+    "instagram": "https://instagram.com/tradeplug255",
+    "tiktok": "https://tiktok.com/@tradeplug255",
+    "facebook": "https://facebook.com/tradeplug255",
+    "youtube": "",
+    "linkedin": ""
+  },
+  "premiumSuppliers": [
+    {
+      "name": "Shenzhen Tech Wholesale",
+      "location": "Shenzhen, China",
+      "category": "Phones & Tablets",
+      "verified": true,
+      "contact": "WhatsApp",
+      "moq": "10 units",
+      "notes": "OEM certified supplier, fast shipping"
+    },
+    {
+      "name": "Guangzhou Gaming Hub",
+      "location": "Guangzhou, China",
+      "category": "Gaming & Accessories",
+      "verified": true,
+      "contact": "WeChat / WhatsApp",
+      "moq": "5 units",
+      "notes": "Consoles, controllers, gaming headsets"
+    },
+    {
+      "name": "Dongguan Laptop Direct",
+      "location": "Dongguan, China",
+      "category": "Laptops",
+      "verified": true,
+      "contact": "WhatsApp",
+      "moq": "3 units",
+      "notes": "MacBook, ThinkPad, gaming laptops"
+    },
+    {
+      "name": "Yiwu Accessories Market",
+      "location": "Yiwu, China",
+      "category": "Accessories",
+      "verified": false,
+      "contact": "On request",
+      "moq": "50 units",
+      "notes": "Earbuds, chargers, cases — verification in progress"
+    }
+  ]
 }

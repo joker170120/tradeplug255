@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="page-catalog" data-segment="telephones">
+<body class="page-catalog" data-segment="restreints" data-require-age="true">
   <header class="site-header">
     <div class="container site-header__inner">
       <a class="brand" href="/" aria-label="TradePlug255 home">
@@ -136,6 +136,20 @@
 
   <a href="#" id="waFloat" class="wa-float" aria-label="WhatsApp">💬</a>
   <div id="statusToast" class="status-toast" role="status"></div>
+
+  <div id="ageGateModal" class="age-gate" role="dialog" aria-modal="true" aria-labelledby="ageGateTitle">
+    <div class="age-gate__backdrop"></div>
+    <div class="age-gate__panel">
+      <h2 id="ageGateTitle">Age verification</h2>
+      <p>Are you 18 years or older?</p>
+      <p class="age-gate__legal muted">In accordance with Tanzanian laws and platform rules for restricted products.</p>
+      <div class="age-gate__actions">
+        <button type="button" id="ageGateYes" class="btn btn--primary">YES</button>
+        <button type="button" id="ageGateNo" class="btn btn--outline">NO</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js" defer></script>
 </body>
 </html>

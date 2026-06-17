@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradePlug255 — Products</title>
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="page-produits">
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="/" aria-label="TradePlug255 home">
+        <img src="/images/logo.svg" alt="" class="brand__logo" width="48" height="48">
+        <div class="brand__text">
+          <span class="brand__name">TradePlug255</span>
+          <span class="brand__tagline">Shop</span>
+        </div>
+      </a>
+      <nav class="site-nav" aria-label="Navigation">
+        <a href="/">Home</a>
+        <a href="/produits/" class="is-active">Products</a>
+        <a href="/premium/">Premium</a>
+        <a href="/contact/">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero hero--compact">
+    <div class="container">
+      <p class="hero__eyebrow">Catalog</p>
+      <h1>Our Products</h1>
+      <p class="hero__lead">Choose a category. Order directly on WhatsApp.</p>
+    </div>
+  </section>
+
+  <main class="container main">
+    <div class="shop-universes__grid shop-universes__grid--produits">
+      <a href="/telephones/" class="universe-card">
+        <div class="universe-card__icon" aria-hidden="true">📱</div>
+        <strong>Phones</strong>
+        <p>New and certified refurbished smartphones.</p>
+      </a>
+      <a href="/laptops/" class="universe-card">
+        <div class="universe-card__icon" aria-hidden="true">💻</div>
+        <strong>Laptops</strong>
+        <p>Office and performance portables.</p>
+      </a>
+      <a href="/tablettes/" class="universe-card">
+        <div class="universe-card__icon" aria-hidden="true">📲</div>
+        <strong>iPad &amp; Tablets</strong>
+        <p>Tablets and related accessories.</p>
+      </a>
+      <a href="/jeux-video/" class="universe-card">
+        <div class="universe-card__icon" aria-hidden="true">🎮</div>
+        <strong>Gaming</strong>
+        <p>Consoles, games and gear.</p>
+      </a>
+      <a href="/accessoires/" class="universe-card">
+        <div class="universe-card__icon" aria-hidden="true">🎧</div>
+        <strong>Accessories</strong>
+        <p>Audio, charging, protection.</p>
+      </a>
+      <a href="/restreints/" class="universe-card universe-card--restricted" data-age-gate-link aria-label="Restricted products 18 plus">
+        <div class="universe-card__icon" aria-hidden="true">🔞</div>
+      </a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <div class="site-footer__brand">
+        <img src="/images/logo.svg" alt="" width="36" height="36">
+        <span>TradePlug255</span>
+      </div>
+      <p class="site-footer__copy">
+        WhatsApp: <a href="https://wa.me/25574879462">+255 748 794 62</a>
+      </p>
+    </div>
+  </footer>
+
+  <div id="ageGateModal" class="age-gate" hidden role="dialog" aria-modal="true" aria-labelledby="ageGateTitle">
+    <div class="age-gate__backdrop"></div>
+    <div class="age-gate__panel">
+      <h2 id="ageGateTitle">Age verification</h2>
+      <p>Are you 18 years or older?</p>
+      <p class="age-gate__legal muted">In accordance with Tanzanian laws and platform rules for restricted products.</p>
+      <div class="age-gate__actions">
+        <button type="button" id="ageGateYes" class="btn btn--primary">YES</button>
+        <button type="button" id="ageGateNo" class="btn btn--outline">NO</button>
+      </div>
+    </div>
+  </div>
+
+  <a href="#" id="waFloat" class="wa-float" aria-label="WhatsApp">💬</a>
+  <script src="/app.js" defer></script>
+</body>
+</html>

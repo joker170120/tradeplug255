@@ -42,7 +42,10 @@
             <select id="segmentInput" name="segment" required>
               <option value="telephones">Phones</option>
               <option value="laptops">Laptops</option>
-              <option value="jeux-video">Video Games</option>
+              <option value="tablettes">iPad &amp; Tablets</option>
+              <option value="jeux-video">Gaming</option>
+              <option value="accessoires">Accessories</option>
+              <option value="restreints">Restricted products (+18)</option>
             </select>
           </label>
           <label class="field">
@@ -55,7 +58,7 @@
           </label>
           <label class="field admin-grid__full">
             <span class="field__label">Description</span>
-            <textarea id="descriptionInput" name="description" rows="4" required></textarea>
+            <textarea id="descriptionInput" name="description" rows="4" placeholder="Short product description for the store" required></textarea>
           </label>
           <label class="field">
             <span class="field__label">Price (TZS)</span>
@@ -64,9 +67,13 @@
           <label class="field">
             <span class="field__label">Upload images</span>
             <input id="imagesInput" name="images" type="file" accept="image/*" multiple>
+            <span class="field__hint">Up to 8 images · JPG, PNG or WebP</span>
           </label>
         </div>
-        <div id="currentImages" class="admin-images"></div>
+        <div class="admin-images-section">
+          <p class="field__label">Current images</p>
+          <div id="currentImages" class="admin-images"></div>
+        </div>
         <div class="admin-form__actions">
           <button class="btn btn--primary" type="submit">Save product</button>
           <button id="resetBtn" class="btn btn--ghost" type="button">Reset form</button>
@@ -86,7 +93,10 @@
           <select id="listSegmentInput">
             <option value="telephones">Phones</option>
             <option value="laptops">Laptops</option>
-            <option value="jeux-video">Video Games</option>
+            <option value="tablettes">iPad &amp; Tablets</option>
+            <option value="jeux-video">Gaming</option>
+            <option value="accessoires">Accessories</option>
+            <option value="restreints">Restricted products (+18)</option>
           </select>
         </label>
         <button id="refreshBtn" class="btn btn--outline" type="button">Refresh</button>

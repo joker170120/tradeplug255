@@ -13,7 +13,7 @@
 <body class="page-catalog" data-segment="laptops">
   <header class="site-header">
     <div class="container site-header__inner">
-      <a class="brand" href="/" aria-label="Back to home">
+      <a class="brand" href="/" aria-label="TradePlug255 home">
         <img src="/images/logo.svg" alt="" class="brand__logo" width="48" height="48">
         <div class="brand__text">
           <span class="brand__name">TradePlug255</span>
@@ -22,22 +22,22 @@
       </a>
       <nav class="site-nav" aria-label="Navigation">
         <a href="/">Home</a>
-        <a href="/telephones/">Phones</a>
-        <a href="/laptops/">Laptops</a>
-        <a href="/jeux-video/">Video Games</a>
-        <a href="#orderPanel">Mes infos</a>
-        <button type="button" id="cartToggleBtn" class="site-nav__cart" aria-label="Open cart">
+        <a href="/produits/" class="is-active">Products</a>
+        <a href="/premium/">Premium</a>
+        <a href="/contact/">Contact</a>
+        <a href="#orderPanel">My details</a>
+        <button type="button" id="cartToggleBtn" class="site-nav__cart" aria-label="Cart">
           Cart <span id="cartCount" class="cart-count" hidden>0</span>
         </button>
       </nav>
     </div>
   </header>
 
-  <section class="hero">
+  <section class="hero hero--compact">
     <div class="container">
       <p class="hero__eyebrow">TradePlug255</p>
       <h1 data-page-title>Catalog</h1>
-      <p class="hero__lead" data-page-lead>Loading products...</p>
+      <p class="hero__lead" data-page-lead>Loading...</p>
     </div>
   </section>
 
@@ -45,12 +45,12 @@
     <section class="panel">
       <div class="panel__head">
         <h2>Catalog</h2>
-        <p>Filter products, add to cart, and order directly on WhatsApp.</p>
+        <p>Filter, add to cart, and order on WhatsApp.</p>
       </div>
       <div class="filters-grid">
         <label class="field">
           <span class="field__label">Search</span>
-          <input id="searchInput" type="search" placeholder="Search products...">
+          <input id="searchInput" type="search" placeholder="Search...">
         </label>
         <label class="field">
           <span class="field__label">Max price (TZS)</span>
@@ -74,32 +74,32 @@
 
     <section class="panel" id="orderPanel">
       <div class="panel__head">
-        <h2>Vos informations</h2>
+        <h2>Your details</h2>
         <p class="order-panel__hint">
-          Les appareils viennent de Chine pour la Tanzanie. Livraison possible en moins d'une semaine (selon disponibilité et destination).
+          Products ship from China to Tanzania. Delivery possible in under one week (subject to availability and destination).
         </p>
       </div>
       <form id="orderForm" class="order-form" novalidate>
         <div class="order-form-grid">
           <label class="field">
-            <span class="field__label">Nom</span>
-            <input id="orderNameInput" name="name" type="text" autocomplete="name" placeholder="Votre nom">
+            <span class="field__label">Name</span>
+            <input id="orderNameInput" name="name" type="text" autocomplete="name" placeholder="Your name">
           </label>
           <label class="field">
             <span class="field__label">WhatsApp</span>
-            <input id="orderPhoneInput" name="phone" type="tel" autocomplete="tel" placeholder="Votre numéro WhatsApp">
+            <input id="orderPhoneInput" name="phone" type="tel" autocomplete="tel" placeholder="Your WhatsApp number">
           </label>
           <label class="field">
-            <span class="field__label">Ville</span>
-            <input id="orderCityInput" name="city" type="text" placeholder="Ville">
+            <span class="field__label">City</span>
+            <input id="orderCityInput" name="city" type="text" placeholder="City">
           </label>
           <label class="field">
-            <span class="field__label">Adresse</span>
-            <input id="orderAddressInput" name="address" type="text" placeholder="Adresse (quartier, repère)">
+            <span class="field__label">Address</span>
+            <input id="orderAddressInput" name="address" type="text" placeholder="Address (area, landmark)">
           </label>
           <label class="field order-form-grid__full">
             <span class="field__label">Notes</span>
-            <textarea id="orderNotesInput" name="notes" rows="2" placeholder="Couleur, modèle, détail, etc."></textarea>
+            <textarea id="orderNotesInput" name="notes" rows="2" placeholder="Color, model, notes, etc."></textarea>
           </label>
         </div>
       </form>
@@ -120,10 +120,10 @@
 
   <div id="cartDrawer" class="cart-drawer" hidden>
     <div id="cartBackdrop" class="cart-drawer__backdrop"></div>
-    <aside class="cart-drawer__panel" aria-label="Cart drawer">
+    <aside class="cart-drawer__panel" aria-label="Cart">
       <div class="cart-drawer__head">
         <h2>Your cart</h2>
-        <button type="button" id="cartCloseBtn" class="cart-drawer__close" aria-label="Close cart">×</button>
+        <button type="button" id="cartCloseBtn" class="cart-drawer__close" aria-label="Close">×</button>
       </div>
       <div id="cartList" class="cart-drawer__list"></div>
       <div class="cart-drawer__foot">

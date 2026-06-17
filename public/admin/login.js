@@ -42,7 +42,11 @@ form.addEventListener("submit", async (e) => {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setStatus(data.error || "Login failed.", false);
+      const msg =
+        data.error === "Invalid password"
+          ? "Incorrect password. Please try again."
+          : data.error || "Login failed.";
+      setStatus(msg, false);
       return;
     }
     window.location.replace("/admin/index.html");

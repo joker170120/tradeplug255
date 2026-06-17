@@ -78,6 +78,20 @@
 .admin-status.is-ok { color: #d4af37; }
 .admin-status.is-err { color: #fca5a5; }
 
+.field__hint {
+  font-size: 0.78rem;
+  color: #78716c;
+  margin-top: 4px;
+}
+
+.admin-images-section {
+  margin-top: 12px;
+}
+
+.admin-images-section .field__label {
+  margin-bottom: 8px;
+}
+
 .admin-list-tools {
   display: flex;
   align-items: end;

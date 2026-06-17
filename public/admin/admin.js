@@ -14,6 +14,19 @@ const resetBtn = document.getElementById("resetBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
+const SEGMENT_LABELS = {
+  telephones: "Phones",
+  laptops: "Laptops",
+  tablettes: "iPad & Tablets",
+  "jeux-video": "Gaming",
+  accessoires: "Accessories",
+  restreints: "Restricted products (+18)"
+};
+
+function segmentLabel(key) {
+  return SEGMENT_LABELS[key] || key;
+}
+
 let selectedKeepImages = [];
 let currentSegmentProducts = [];
 
@@ -45,6 +58,7 @@ function resetForm() {
   segmentInput.value = listSegmentInput.value;
   selectedKeepImages = [];
   renderCurrentImages();
+  setStatus("");
 }
 
 function renderCurrentImages() {
@@ -82,13 +96,15 @@ function fillForm(product, segment) {
     .map(normalizeImageUrl)
     .filter(Boolean);
   renderCurrentImages();
+  setStatus(`Editing: ${product.name}`, true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function renderTable(segment, products) {
   currentSegmentProducts = products;
+  const category = segmentLabel(segment);
   if (!products.length) {
-    productTableWrap.innerHTML = '<p class="empty-state">No products yet for this category.</p>';
+    productTableWrap.innerHTML = `<p class="empty-state">No products in <strong>${escapeHtml(category)}</strong> yet. Use the form above to add one.</p>`;
     return;
   }
   const rows = products
@@ -97,6 +113,7 @@ function renderTable(segment, products) {
       return `<tr>
         <td>${image ? `<img src="${escapeHtml(image)}" alt="" class="admin-thumb">` : "—"}</td>
         <td><strong>${escapeHtml(p.name)}</strong><br><small>${escapeHtml(p.condition || "")}</small></td>
+        <td>${escapeHtml(category)}</td>
         <td>${Number(p.price || 0).toLocaleString("en-US")} ${escapeHtml(p.currencySymbol || "TZS")}</td>
         <td class="admin-row-actions">
           <button class="btn btn--outline" type="button" data-edit="${escapeHtml(p.id)}">Edit</button>
@@ -110,7 +127,7 @@ function renderTable(segment, products) {
     <div class="admin-table-scroll">
       <table class="admin-table">
         <thead>
-          <tr><th>Image</th><th>Product</th><th>Price</th><th>Actions</th></tr>
+          <tr><th>Image</th><th>Product</th><th>Category</th><th>Price</th><th>Actions</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -127,7 +144,7 @@ function renderTable(segment, products) {
   productTableWrap.querySelectorAll("[data-delete]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const id = btn.getAttribute("data-delete");
-      if (!confirm("Delete this product?")) return;
+      if (!confirm("Delete this product permanently?")) return;
       try {
         const res = await fetch("/api/admin/product", {
           method: "DELETE",
@@ -147,6 +164,7 @@ function renderTable(segment, products) {
 }
 
 async function loadSegment(segment) {
+  productTableWrap.innerHTML = '<p class="empty-state">Loading products…</p>';
   const res = await fetch(`/api/admin/products?segment=${encodeURIComponent(segment)}`, {
     credentials: "include",
     cache: "no-store"
@@ -172,7 +190,7 @@ async function checkSession() {
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  setStatus("");
+  setStatus("Saving product…");
   const fd = new FormData();
   fd.append("id", productIdInput.value);
   fd.append("segment", segmentInput.value);
