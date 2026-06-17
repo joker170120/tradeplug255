@@ -30,7 +30,7 @@ Open: `http://localhost:3080`
 - The customer must click **Confirm my purchase** in their profile to move it to order history
 - No integrated payment — manual confirmation only
 
-User data is stored on disk in the `storage/` folder (not in `public/`).
+User data, product catalogs, and uploaded images are stored on disk in the `storage/` folder (not in `public/`).
 
 ## Admin panel
 
@@ -44,7 +44,7 @@ The admin lets you:
 - Upload multiple images per product
 - Manage all categories: Phones, Laptops, iPad & Tablets, Gaming, Accessories, Restricted (+18)
 
-Product JSON files:
+Product seed files (initial catalog, committed in git):
 
 - `public/data/produits-telephones.json`
 - `public/data/produits-laptops.json`
@@ -53,9 +53,10 @@ Product JSON files:
 - `public/data/produits-accessoires.json`
 - `public/data/produits-restreints.json`
 
-Uploaded images are saved in:
+At runtime, the admin saves catalogs and images to persistent storage:
 
-- `public/uploads/`
+- `storage/data/produits-*.json` — live product catalogs
+- `storage/uploads/` — uploaded product images
 
 ## Deploy on Coolify
 
@@ -76,25 +77,31 @@ PORT=3080
 
 ### 3. Persistent storage (required)
 
-Mount a persistent volume so user accounts and orders survive restarts:
+Mount **one** persistent volume on `/app/storage` so everything survives redeployments:
 
-| Container path | Purpose |
-|----------------|---------|
-| `/app/storage` | `users.json`, `orders.json`, `user-sessions.json` |
+| Path inside volume | Purpose |
+|--------------------|---------|
+| `users.json` | Customer accounts |
+| `orders.json` | Pending and confirmed orders |
+| `user-sessions.json` | Login sessions |
+| `data/produits-*.json` | Product catalogs edited in admin |
+| `uploads/` | Product images uploaded in admin |
 
 In Coolify: **Storages** → add volume → mount to `/app/storage` (adjust path if your app root differs).
 
-Optional: also mount `/app/public/uploads` if you want product images to persist across redeploys.
+Without this volume, photos and admin changes are lost on each redeploy.
 
 ### 4. Files written at runtime
 
 ```
-storage/users.json          # registered users (bcrypt hashes)
-storage/orders.json         # pending + confirmed orders
-storage/user-sessions.json  # login sessions
+storage/users.json              # registered users (bcrypt hashes)
+storage/orders.json             # pending + confirmed orders
+storage/user-sessions.json      # login sessions
+storage/data/produits-*.json    # live product catalogs
+storage/uploads/                # uploaded images served at /uploads/...
 ```
 
-These files are gitignored. Only `storage/.gitkeep` is committed.
+These runtime files are gitignored. Only `.gitkeep` placeholders are committed.
 
 ## Deploy on Vercel (optional)
 

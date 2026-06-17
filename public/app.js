@@ -118,6 +118,101 @@ function formatPrice(amount, symbol) {
   return `${Number(amount).toLocaleString("en-US")} ${s}`;
 }
 
+function getProductImages(product) {
+  const images = Array.isArray(product?.images) ? product.images.filter(Boolean) : [];
+  if (images.length) return images;
+  if (product?.image) return [product.image];
+  return [];
+}
+
+let imageLightboxState = { images: [], index: 0, caption: "" };
+
+function ensureImageLightbox() {
+  if (document.getElementById("imageLightbox")) return;
+
+  const lightbox = document.createElement("div");
+  lightbox.id = "imageLightbox";
+  lightbox.className = "image-lightbox";
+  lightbox.hidden = true;
+  lightbox.innerHTML = `
+    <div class="image-lightbox__backdrop" data-lightbox-close></div>
+    <div class="image-lightbox__dialog" role="dialog" aria-modal="true" aria-label="Product image preview">
+      <button type="button" class="image-lightbox__close" data-lightbox-close aria-label="Close">×</button>
+      <button type="button" class="image-lightbox__nav image-lightbox__nav--prev" id="imageLightboxPrev" aria-label="Previous image" hidden>‹</button>
+      <img id="imageLightboxImg" class="image-lightbox__img" src="" alt="">
+      <button type="button" class="image-lightbox__nav image-lightbox__nav--next" id="imageLightboxNext" aria-label="Next image" hidden>›</button>
+      <p id="imageLightboxCaption" class="image-lightbox__caption"></p>
+    </div>`;
+  document.body.appendChild(lightbox);
+
+  lightbox.querySelectorAll("[data-lightbox-close]").forEach((el) => {
+    el.addEventListener("click", closeImageLightbox);
+  });
+  document.getElementById("imageLightboxPrev")?.addEventListener("click", () => stepImageLightbox(-1));
+  document.getElementById("imageLightboxNext")?.addEventListener("click", () => stepImageLightbox(1));
+}
+
+function paintImageLightbox() {
+  const lightbox = document.getElementById("imageLightbox");
+  const imgEl = document.getElementById("imageLightboxImg");
+  const captionEl = document.getElementById("imageLightboxCaption");
+  const prevBtn = document.getElementById("imageLightboxPrev");
+  const nextBtn = document.getElementById("imageLightboxNext");
+  if (!lightbox || !imgEl) return;
+
+  const { images, index, caption } = imageLightboxState;
+  const src = images[index] || "";
+  imgEl.src = src;
+  imgEl.alt = caption ? `${caption} — image ${index + 1}` : `Product image ${index + 1}`;
+  if (captionEl) {
+    const counter = images.length > 1 ? ` (${index + 1}/${images.length})` : "";
+    captionEl.textContent = caption ? `${caption}${counter}` : "";
+  }
+  if (prevBtn) prevBtn.hidden = images.length <= 1;
+  if (nextBtn) nextBtn.hidden = images.length <= 1;
+}
+
+function openImageLightbox(images, startIndex, caption) {
+  const list = (Array.isArray(images) ? images : []).filter(Boolean);
+  if (!list.length) return;
+
+  ensureImageLightbox();
+  imageLightboxState = {
+    images: list,
+    index: Math.min(Math.max(startIndex || 0, 0), list.length - 1),
+    caption: String(caption || "")
+  };
+  paintImageLightbox();
+
+  const lightbox = document.getElementById("imageLightbox");
+  if (!lightbox) return;
+  lightbox.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeImageLightbox() {
+  const lightbox = document.getElementById("imageLightbox");
+  if (!lightbox || lightbox.hidden) return;
+  lightbox.hidden = true;
+  const imgEl = document.getElementById("imageLightboxImg");
+  if (imgEl) imgEl.src = "";
+  if (!cartDrawerEl || cartDrawerEl.hidden) {
+    document.body.style.overflow = "";
+  }
+}
+
+function stepImageLightbox(delta) {
+  const { images, index } = imageLightboxState;
+  if (images.length <= 1) return;
+  imageLightboxState.index = (index + delta + images.length) % images.length;
+  paintImageLightbox();
+}
+
+function isImageLightboxOpen() {
+  const lightbox = document.getElementById("imageLightbox");
+  return Boolean(lightbox && !lightbox.hidden);
+}
+
 function setStatus(message, ok) {
   if (!statusToastEl) return;
   statusToastEl.textContent = message || "";
@@ -467,12 +562,20 @@ function renderProducts() {
   }
 
   for (const product of list) {
-    const img = (Array.isArray(product.images) && product.images[0]) || product.image || "";
+    const images = getProductImages(product);
+    const img = images[0] || "";
     const card = document.createElement("article");
     card.className = "product-card";
     card.innerHTML = `
-      <div class="product-card__media">
-        ${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy" />` : `<span class="product-card__placeholder">${segment?.emoji || "📦"}<br/>Image coming soon</span>`}
+      <div class="product-card__media${img ? " product-card__media--zoomable" : ""}">
+        ${
+          img
+            ? `<button type="button" class="product-card__zoom" data-zoom-product="${escapeHtml(product.id)}" aria-label="View ${escapeHtml(product.name)} in full size">
+                <img src="${escapeHtml(img)}" alt="${escapeHtml(product.name)}" loading="lazy" />
+                <span class="product-card__zoom-hint" aria-hidden="true">Tap to enlarge</span>
+              </button>`
+            : `<span class="product-card__placeholder">${segment?.emoji || "📦"}<br/>Image coming soon</span>`
+        }
       </div>
       <div class="product-card__body">
         ${product.condition ? `<span class="product-card__condition">${escapeHtml(product.condition)}</span>` : ""}
@@ -501,6 +604,14 @@ function renderProducts() {
     btn.addEventListener("click", () => {
       const product = products.find((entry) => entry.id === btn.getAttribute("data-order-wa"));
       if (product) handleProductOrder(product);
+    });
+  });
+  productListEl.querySelectorAll("[data-zoom-product]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const product = products.find((entry) => entry.id === btn.getAttribute("data-zoom-product"));
+      if (!product) return;
+      const images = getProductImages(product);
+      if (images.length) openImageLightbox(images, 0, product.name);
     });
   });
 }
@@ -543,7 +654,12 @@ function bindUi() {
   });
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && cartDrawerEl && !cartDrawerEl.hidden) closeCartDrawer();
+    if (e.key !== "Escape") return;
+    if (isImageLightboxOpen()) {
+      closeImageLightbox();
+      return;
+    }
+    if (cartDrawerEl && !cartDrawerEl.hidden) closeCartDrawer();
   });
 }
 

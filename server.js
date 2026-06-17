@@ -10,34 +10,82 @@ const bcrypt = require("bcryptjs");
 const PORT = Number(process.env.PORT) || 3080;
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "17012004mango");
 const PUBLIC = path.join(__dirname, "public");
-const DATA = path.join(PUBLIC, "data");
-const UPLOADS = path.join(PUBLIC, "uploads");
+const PUBLIC_DATA = path.join(PUBLIC, "data");
+const LEGACY_UPLOADS = path.join(PUBLIC, "uploads");
 const STORAGE = path.join(__dirname, "storage");
+const STORAGE_DATA = path.join(STORAGE, "data");
+const STORAGE_UPLOADS = path.join(STORAGE, "uploads");
 const USERS_FILE = path.join(STORAGE, "users.json");
 const ORDERS_FILE = path.join(STORAGE, "orders.json");
 const USER_SESSIONS_FILE = path.join(STORAGE, "user-sessions.json");
 const BCRYPT_ROUNDS = 10;
 
-const SEGMENT_FILES = {
-  telephones: path.join(DATA, "produits-telephones.json"),
-  laptops: path.join(DATA, "produits-laptops.json"),
-  tablettes: path.join(DATA, "produits-tablettes.json"),
-  "jeux-video": path.join(DATA, "produits-jeux-video.json"),
-  accessoires: path.join(DATA, "produits-accessoires.json"),
-  restreints: path.join(DATA, "produits-restreints.json")
+const SEGMENT_FILENAMES = {
+  telephones: "produits-telephones.json",
+  laptops: "produits-laptops.json",
+  tablettes: "produits-tablettes.json",
+  "jeux-video": "produits-jeux-video.json",
+  accessoires: "produits-accessoires.json",
+  restreints: "produits-restreints.json"
 };
+
+const SEGMENT_FILES = Object.fromEntries(
+  Object.entries(SEGMENT_FILENAMES).map(([segment, filename]) => [
+    segment,
+    path.join(STORAGE_DATA, filename)
+  ])
+);
 
 const sessions = new Map();
 const userSessions = new Map();
 
 function ensureDirs() {
-  for (const dir of [PUBLIC, DATA, UPLOADS, STORAGE]) {
+  for (const dir of [PUBLIC, PUBLIC_DATA, STORAGE, STORAGE_DATA, STORAGE_UPLOADS]) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
   if (!fs.existsSync(USERS_FILE)) writeJson(USERS_FILE, []);
   if (!fs.existsSync(ORDERS_FILE)) writeJson(ORDERS_FILE, []);
   if (!fs.existsSync(USER_SESSIONS_FILE)) writeJson(USER_SESSIONS_FILE, {});
+  seedStorageCatalogs();
+  migrateLegacyUploads();
   loadUserSessions();
+}
+
+function seedStorageCatalogs() {
+  for (const filename of Object.values(SEGMENT_FILENAMES)) {
+    const storageFile = path.join(STORAGE_DATA, filename);
+    const seedFile = path.join(PUBLIC_DATA, filename);
+
+    if (!fs.existsSync(storageFile) && fs.existsSync(seedFile)) {
+      fs.copyFileSync(seedFile, storageFile);
+    } else if (!fs.existsSync(storageFile)) {
+      writeJson(storageFile, []);
+    }
+  }
+
+  // One-time migration if catalogs were previously saved in public/data on the server.
+  for (const filename of Object.values(SEGMENT_FILENAMES)) {
+    const storageFile = path.join(STORAGE_DATA, filename);
+    const legacyFile = path.join(PUBLIC_DATA, filename);
+    if (!fs.existsSync(legacyFile) || !fs.existsSync(storageFile)) continue;
+
+    const legacyMtime = fs.statSync(legacyFile).mtimeMs;
+    const storageMtime = fs.statSync(storageFile).mtimeMs;
+    if (legacyMtime > storageMtime) {
+      fs.copyFileSync(legacyFile, storageFile);
+    }
+  }
+}
+
+function migrateLegacyUploads() {
+  if (!fs.existsSync(LEGACY_UPLOADS)) return;
+
+  for (const entry of fs.readdirSync(LEGACY_UPLOADS)) {
+    const src = path.join(LEGACY_UPLOADS, entry);
+    if (!fs.statSync(src).isFile()) continue;
+    const dest = path.join(STORAGE_UPLOADS, entry);
+    if (!fs.existsSync(dest)) fs.copyFileSync(src, dest);
+  }
 }
 
 function loadUserSessions() {
@@ -235,7 +283,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, UPLOADS),
+    destination: (_req, _file, cb) => cb(null, STORAGE_UPLOADS),
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase();
       const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
@@ -487,6 +535,8 @@ app.post("/api/orders/:id/confirm", requireUser, (req, res) => {
   writeOrders(orders);
   return res.json({ ok: true, order: orders[index] });
 });
+
+app.use("/uploads", express.static(STORAGE_UPLOADS, { fallthrough: false, maxAge: "7d" }));
 
 app.use(express.static(PUBLIC, { extensions: ["html"] }));
 
