@@ -64,6 +64,14 @@ body {
 .brand__logo {
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
+  object-fit: contain;
+  background: #1a1816;
+}
+
+.site-footer__brand img,
+.admin-login-card img {
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .brand__name {
