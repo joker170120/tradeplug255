@@ -9,6 +9,7 @@ const bcrypt = require("bcryptjs");
 
 const PORT = Number(process.env.PORT) || 3080;
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "17012004mango");
+const SITE_URL = String(process.env.SITE_URL || "https://tradeplug255.com").replace(/\/$/, "");
 const PUBLIC = path.join(__dirname, "public");
 const PUBLIC_DATA = path.join(PUBLIC, "data");
 const LEGACY_UPLOADS = path.join(PUBLIC, "uploads");
@@ -35,6 +36,19 @@ const SEGMENT_FILES = Object.fromEntries(
     path.join(STORAGE_DATA, filename)
   ])
 );
+
+const SITEMAP_PATHS = [
+  { path: "/", priority: "1.0", changefreq: "weekly" },
+  { path: "/produits/", priority: "0.9", changefreq: "weekly" },
+  { path: "/telephones/", priority: "0.8", changefreq: "weekly" },
+  { path: "/laptops/", priority: "0.8", changefreq: "weekly" },
+  { path: "/tablettes/", priority: "0.8", changefreq: "weekly" },
+  { path: "/accessoires/", priority: "0.8", changefreq: "weekly" },
+  { path: "/jeux-video/", priority: "0.8", changefreq: "weekly" },
+  { path: "/premium/", priority: "0.7", changefreq: "monthly" },
+  { path: "/contact/", priority: "0.7", changefreq: "monthly" },
+  { path: "/profile/", priority: "0.5", changefreq: "monthly" }
+];
 
 const sessions = new Map();
 const userSessions = new Map();
@@ -534,6 +548,23 @@ app.post("/api/orders/:id/confirm", requireUser, (req, res) => {
   };
   writeOrders(orders);
   return res.json({ ok: true, order: orders[index] });
+});
+
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain").send(
+    `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`
+  );
+});
+
+app.get("/sitemap.xml", (_req, res) => {
+  const lastmod = new Date().toISOString().slice(0, 10);
+  const urls = SITEMAP_PATHS.map(({ path: pagePath, priority, changefreq }) => {
+    const loc = pagePath === "/" ? `${SITE_URL}/` : `${SITE_URL}${pagePath}`;
+    return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+  }).join("\n");
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  res.type("application/xml").send(xml);
 });
 
 app.use("/uploads", express.static(STORAGE_UPLOADS, { fallthrough: false, maxAge: "7d" }));

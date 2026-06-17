@@ -666,7 +666,6 @@ function bindUi() {
 async function initHub() {
   const siteData = await fetchJson("/data/site.json");
   site = { ...site, ...siteData };
-  document.title = `${site.shopName} — The Prestige`;
   const brandName = document.querySelector(".brand__name");
   if (brandName) brandName.textContent = site.shopName;
   applySocialLinks("homeSocialLinks", site.social);

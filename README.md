@@ -73,7 +73,10 @@ Coolify is the recommended host. The app is a Node.js server (`npm start`).
 ```env
 ADMIN_PASSWORD=your-secure-admin-password
 PORT=3080
+SITE_URL=https://your-domain.com
 ```
+
+`SITE_URL` is used for `robots.txt` and `sitemap.xml`.
 
 ### 3. Persistent storage (required)
 
