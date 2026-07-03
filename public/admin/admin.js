@@ -48,7 +48,7 @@ function normalizeImageUrl(src) {
   const s = src.trim();
   if (!s) return "";
   if (s.startsWith("/uploads/")) return s;
-  if (/^https?:\/\//i.test(s) && /blob\.vercel-storage\.com/i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return s;
   return "";
 }
 

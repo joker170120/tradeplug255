@@ -64,15 +64,17 @@ Coolify is the recommended host. The app is a Node.js server (`npm start`).
 
 ### 1. Create the application
 
-- **Build pack:** Nixpacks or Dockerfile (Node 18+)
+- **Build pack:** Dockerfile recommended
 - **Start command:** `npm start`
 - **Port:** `3080` (or set `PORT` env var)
+- **Health check path:** `/healthz`
 
 ### 2. Environment variables
 
 ```env
 ADMIN_PASSWORD=your-secure-admin-password
 PORT=3080
+HOST=0.0.0.0
 SITE_URL=https://your-domain.com
 ```
 
@@ -94,7 +96,19 @@ In Coolify: **Storages** → add volume → mount to `/app/storage` (adjust path
 
 Without this volume, photos and admin changes are lost on each redeploy.
 
-### 4. Files written at runtime
+If Coolify uses the included `Dockerfile`, the container declares `/app/storage` as a volume, but you still need to attach persistent storage in the Coolify dashboard.
+
+### 4. Domains / HTTPS
+
+Attach both domains to the same application if needed:
+
+- `https://tradeplug255.com`
+- `https://www.tradeplug255.com`
+- the temporary `sslip.io` Coolify URL
+
+If HTTPS returns `503 no available server` while HTTP works, check the Coolify proxy/domain configuration and make sure the application is running on port `3080`.
+
+### 5. Files written at runtime
 
 ```
 storage/users.json              # registered users (bcrypt hashes)
@@ -106,10 +120,66 @@ storage/uploads/                # uploaded images served at /uploads/...
 
 These runtime files are gitignored. Only `.gitkeep` placeholders are committed.
 
-## Deploy on Vercel (optional)
+## Deploy on Vercel
 
-Serverless mode exports the Express app. **User/order file storage will not persist** on Vercel — use Coolify for accounts and orders.
+TradePlug255 is configured for Vercel with an Express serverless function (`api/index.js`).
+
+### 1. Connect the GitHub repo
+
+1. Import [github.com/joker170120/tradeplug255](https://github.com/joker170120/tradeplug255) on [vercel.com/new](https://vercel.com/new)
+2. Framework preset: **Other** (Node.js)
+3. Root directory: `.` (project root)
+4. Build command: leave empty (static `public/` + serverless API)
+5. Output directory: leave empty
+
+### 2. Environment variables (Project → Settings → Environment Variables)
+
+| Variable | Required | Example |
+|----------|----------|---------|
+| `ADMIN_PASSWORD` | Yes | your secure password |
+| `SITE_URL` | Yes | `https://tradeplug255.vercel.app` or your custom domain |
+| `BLOB_READ_WRITE_TOKEN` | **Yes on Vercel** | from Vercel → Storage → Blob → Connect |
+
+Without **Vercel Blob** (or external FTP/S3), admin uploads and catalog edits **will not persist** after a redeploy.
+
+Optional Blob (public image URLs):
+
+```env
+BLOB_PUBLIC_IMAGES=1
+```
+
+### 3. Deploy
 
 ```bash
-npx vercel deploy --prod
+npm install -g vercel
+cd tradeplug255
+vercel link
+vercel --prod
 ```
+
+Or push to `main` — Vercel redeploys automatically if Git integration is enabled.
+
+### 4. Custom domain
+
+In Vercel → Domains, add `tradeplug255.com` and set:
+
+```env
+SITE_URL=https://tradeplug255.com
+```
+
+### 5. What works on Vercel
+
+- Storefront pages (`public/`)
+- Admin panel (`/admin/`)
+- Product APIs and image upload (with Blob)
+- Customer accounts & orders (with Blob)
+- `robots.txt` / `sitemap.xml`
+
+### 6. Coolify vs Vercel
+
+| | Coolify | Vercel |
+|---|---------|--------|
+| Persistent disk | Volume on `/app/storage` | Blob / S3 / FTP required |
+| Best for | Full VPS control | Fast global CDN + HTTPS |
+
+For production with many admin edits, **Coolify + volume** or **Vercel + Blob** both work.

@@ -6,10 +6,13 @@ const crypto = require("node:crypto");
 const express = require("express");
 const multer = require("multer");
 const bcrypt = require("bcryptjs");
+const { createPersistentStore } = require("./persistent-store");
 
 const PORT = Number(process.env.PORT) || 3080;
+const HOST = String(process.env.HOST || "0.0.0.0");
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "17012004mango");
 const SITE_URL = String(process.env.SITE_URL || "https://tradeplug255.com").replace(/\/$/, "");
+const IS_VERCEL = Boolean(process.env.VERCEL || process.env.NOW_REGION);
 const PUBLIC = path.join(__dirname, "public");
 const PUBLIC_DATA = path.join(PUBLIC, "data");
 const LEGACY_UPLOADS = path.join(PUBLIC, "uploads");
@@ -20,6 +23,12 @@ const USERS_FILE = path.join(STORAGE, "users.json");
 const ORDERS_FILE = path.join(STORAGE, "orders.json");
 const USER_SESSIONS_FILE = path.join(STORAGE, "user-sessions.json");
 const BCRYPT_ROUNDS = 10;
+
+const persistentStore = createPersistentStore({
+  publicDir: PUBLIC,
+  storageDir: STORAGE,
+  isVercel: IS_VERCEL
+});
 
 const SEGMENT_FILENAMES = {
   telephones: "produits-telephones.json",
@@ -54,6 +63,8 @@ const sessions = new Map();
 const userSessions = new Map();
 
 function ensureDirs() {
+  if (persistentStore.isActive()) return;
+  if (IS_VERCEL) return;
   for (const dir of [PUBLIC, PUBLIC_DATA, STORAGE, STORAGE_DATA, STORAGE_UPLOADS]) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
@@ -102,9 +113,9 @@ function migrateLegacyUploads() {
   }
 }
 
-function loadUserSessions() {
+async function loadUserSessions() {
   userSessions.clear();
-  const raw = readJson(USER_SESSIONS_FILE, {});
+  const raw = await readJson("user-sessions.json", {});
   if (!raw || typeof raw !== "object") return;
   const now = Date.now();
   for (const [token, session] of Object.entries(raw)) {
@@ -114,7 +125,7 @@ function loadUserSessions() {
   }
 }
 
-function saveUserSessions() {
+async function saveUserSessions() {
   const now = Date.now();
   const out = {};
   for (const [token, session] of userSessions.entries()) {
@@ -122,25 +133,25 @@ function saveUserSessions() {
       out[token] = session;
     }
   }
-  writeJson(USER_SESSIONS_FILE, out);
+  await writeJson("user-sessions.json", out);
 }
 
-function readUsers() {
-  const arr = readJson(USERS_FILE, []);
+async function readUsers() {
+  const arr = await readJson("users.json", []);
   return Array.isArray(arr) ? arr : [];
 }
 
-function writeUsers(users) {
-  writeJson(USERS_FILE, Array.isArray(users) ? users : []);
+async function writeUsers(users) {
+  await writeJson("users.json", Array.isArray(users) ? users : []);
 }
 
-function readOrders() {
-  const arr = readJson(ORDERS_FILE, []);
+async function readOrders() {
+  const arr = await readJson("orders.json", []);
   return Array.isArray(arr) ? arr : [];
 }
 
-function writeOrders(orders) {
-  writeJson(ORDERS_FILE, Array.isArray(orders) ? orders : []);
+async function writeOrders(orders) {
+  await writeJson("orders.json", Array.isArray(orders) ? orders : []);
 }
 
 function publicUser(user) {
@@ -152,24 +163,27 @@ function publicUser(user) {
   };
 }
 
-function createUserSession(res, userId) {
+async function createUserSession(res, userId) {
+  await loadUserSessions();
   const token = crypto.randomBytes(24).toString("hex");
   const exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
   userSessions.set(token, { userId: String(userId), exp });
-  saveUserSessions();
+  await saveUserSessions();
   res.setHeader(
     "Set-Cookie",
     `tp_user=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
   );
 }
 
-function clearUserSession(res, token) {
+async function clearUserSession(res, token) {
+  await loadUserSessions();
   if (token) userSessions.delete(token);
-  saveUserSessions();
+  await saveUserSessions();
   res.setHeader("Set-Cookie", "tp_user=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0");
 }
 
-function getUserId(req) {
+async function getUserId(req) {
+  await loadUserSessions();
   const cookies = parseCookies(req.headers.cookie || "");
   const token = cookies.tp_user;
   if (!token) return null;
@@ -177,14 +191,14 @@ function getUserId(req) {
   if (!session) return null;
   if (Date.now() > session.exp) {
     userSessions.delete(token);
-    saveUserSessions();
+    await saveUserSessions();
     return null;
   }
   return session.userId;
 }
 
-function requireUser(req, res, next) {
-  const userId = getUserId(req);
+async function requireUser(req, res, next) {
+  const userId = await getUserId(req);
   if (!userId) return res.status(401).json({ error: "Login required" });
   req.userId = userId;
   return next();
@@ -208,9 +222,12 @@ function normalizeOrderItems(items) {
   return normalized.length ? normalized : null;
 }
 
-function readJson(filePath, fallback) {
+async function readJson(filePathOrRel, fallback) {
+  if (persistentStore.isActive()) {
+    return persistentStore.readJson(storageRelativePath(filePathOrRel), fallback);
+  }
   try {
-    const raw = fs.readFileSync(filePath, "utf8");
+    const raw = fs.readFileSync(filePathOrRel, "utf8");
     const data = JSON.parse(raw);
     return data ?? fallback;
   } catch {
@@ -218,8 +235,18 @@ function readJson(filePath, fallback) {
   }
 }
 
-function writeJson(filePath, data) {
-  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+async function writeJson(filePathOrRel, data) {
+  if (persistentStore.isActive()) {
+    await persistentStore.writeJson(storageRelativePath(filePathOrRel), data);
+    return;
+  }
+  fs.writeFileSync(filePathOrRel, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+function storageRelativePath(filePathOrRel) {
+  const s = String(filePathOrRel || "");
+  if (!path.isAbsolute(s)) return s.replace(/^\/+/, "");
+  return path.relative(STORAGE, s).replace(/\\/g, "/");
 }
 
 function normalizeImageUrl(src) {
@@ -227,21 +254,34 @@ function normalizeImageUrl(src) {
   const s = src.trim();
   if (!s) return "";
   if (s.startsWith("/uploads/")) return s;
-  if (/^https?:\/\//i.test(s) && /blob\.vercel-storage\.com/i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return s;
   return "";
 }
 
-function listSegment(segment) {
+async function deleteImageUrl(src) {
+  const normalized = normalizeImageUrl(src);
+  if (!normalized) return;
+  await persistentStore.deleteImage(normalized);
+}
+
+async function deleteRemovedUploadFiles(previous, next) {
+  const nextSet = new Set((Array.isArray(next) ? next : []).map(normalizeImageUrl).filter(Boolean));
+  for (const src of (Array.isArray(previous) ? previous : []).map(normalizeImageUrl).filter(Boolean)) {
+    if (!nextSet.has(src)) await deleteImageUrl(src);
+  }
+}
+
+async function listSegment(segment) {
   const file = SEGMENT_FILES[segment];
   if (!file) return [];
-  const arr = readJson(file, []);
+  const arr = await readJson(file, []);
   return Array.isArray(arr) ? arr : [];
 }
 
-function saveSegment(segment, products) {
+async function saveSegment(segment, products) {
   const file = SEGMENT_FILES[segment];
   if (!file) return;
-  writeJson(file, Array.isArray(products) ? products : []);
+  await writeJson(file, Array.isArray(products) ? products : []);
 }
 
 function parseCookies(cookieHeader) {
@@ -296,14 +336,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, STORAGE_UPLOADS),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || "").toLowerCase();
-      const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
-      cb(null, `${crypto.randomUUID()}${safeExt}`);
-    }
-  }),
+  storage: persistentStore.useMemoryUploads()
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: (_req, _file, cb) => cb(null, STORAGE_UPLOADS),
+        filename: (_req, file, cb) => {
+          const ext = path.extname(file.originalname || "").toLowerCase();
+          const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
+          cb(null, `${crypto.randomUUID()}${safeExt}`);
+        }
+      }),
   limits: { fileSize: 8 * 1024 * 1024, files: 8 }
 });
 
@@ -324,29 +366,29 @@ app.post("/api/admin/logout", (req, res) => {
   return res.json({ ok: true });
 });
 
-app.get("/api/products/:segment", (req, res) => {
+app.get("/api/products/:segment", async (req, res) => {
   const segment = String(req.params.segment || "");
   if (!SEGMENT_FILES[segment]) return res.status(404).json({ error: "Segment not found" });
-  return res.json({ products: listSegment(segment) });
+  return res.json({ products: await listSegment(segment) });
 });
 
-app.get("/api/admin/products", requireAdmin, (req, res) => {
+app.get("/api/admin/products", requireAdmin, async (req, res) => {
   const segment = String(req.query.segment || "");
   if (segment) {
     if (!SEGMENT_FILES[segment]) return res.status(404).json({ error: "Segment not found" });
-    return res.json({ segment, products: listSegment(segment) });
+    return res.json({ segment, products: await listSegment(segment) });
   }
   return res.json({
-    telephones: listSegment("telephones"),
-    laptops: listSegment("laptops"),
-    tablettes: listSegment("tablettes"),
-    "jeux-video": listSegment("jeux-video"),
-    accessoires: listSegment("accessoires"),
-    restreints: listSegment("restreints")
+    telephones: await listSegment("telephones"),
+    laptops: await listSegment("laptops"),
+    tablettes: await listSegment("tablettes"),
+    "jeux-video": await listSegment("jeux-video"),
+    accessoires: await listSegment("accessoires"),
+    restreints: await listSegment("restreints")
   });
 });
 
-app.post("/api/admin/product", requireAdmin, upload.array("images", 8), (req, res) => {
+app.post("/api/admin/product", requireAdmin, upload.array("images", 8), async (req, res) => {
   const segment = String(req.body?.segment || "");
   if (!SEGMENT_FILES[segment]) return res.status(400).json({ error: "Invalid segment" });
 
@@ -372,9 +414,17 @@ app.post("/api/admin/product", requireAdmin, upload.array("images", 8), (req, re
   }
 
   const files = Array.isArray(req.files) ? req.files : [];
-  const uploaded = files.map((f) => `/uploads/${path.basename(f.filename)}`);
+  const uploaded = [];
+  for (const f of files) {
+    if (persistentStore.useMemoryUploads()) {
+      const ext = path.extname(f.originalname || "").toLowerCase();
+      uploaded.push(await persistentStore.uploadImage(f, ext));
+    } else {
+      uploaded.push(`/uploads/${path.basename(f.filename)}`);
+    }
+  }
 
-  const list = listSegment(segment);
+  const list = await listSegment(segment);
   const existingIndex = id ? list.findIndex((p) => String(p.id) === id) : -1;
   const existing = existingIndex >= 0 ? list[existingIndex] : null;
   const prevImages = Array.isArray(existing?.images)
@@ -386,6 +436,7 @@ app.post("/api/admin/product", requireAdmin, upload.array("images", 8), (req, re
   const removeImages = String(req.body?.removeImages || "").toLowerCase() === "true";
   const baseImages = removeImages ? [] : keepImages || prevImages;
   const images = [...baseImages, ...uploaded].filter(Boolean);
+  await deleteRemovedUploadFiles(prevImages, images);
 
   const product = {
     id: existing?.id || crypto.randomUUID(),
@@ -400,18 +451,23 @@ app.post("/api/admin/product", requireAdmin, upload.array("images", 8), (req, re
 
   if (existingIndex >= 0) list[existingIndex] = { ...existing, ...product };
   else list.unshift(product);
-  saveSegment(segment, list);
+  await saveSegment(segment, list);
 
   return res.json({ ok: true, segment, product });
 });
 
-app.delete("/api/admin/product", requireAdmin, (req, res) => {
+app.delete("/api/admin/product", requireAdmin, async (req, res) => {
   const segment = String(req.body?.segment || "");
   const id = String(req.body?.id || "");
   if (!SEGMENT_FILES[segment] || !id) return res.status(400).json({ error: "Missing segment or id" });
-  const list = listSegment(segment);
+  const list = await listSegment(segment);
+  const removed = list.find((p) => String(p.id) === id);
   const next = list.filter((p) => String(p.id) !== id);
-  saveSegment(segment, next);
+  await saveSegment(segment, next);
+  if (removed) {
+    const images = Array.isArray(removed.images) ? removed.images : removed.image ? [removed.image] : [];
+    await deleteRemovedUploadFiles(images, []);
+  }
   return res.json({ ok: true });
 });
 
@@ -431,7 +487,7 @@ app.post("/api/auth/register", async (req, res) => {
     return res.status(400).json({ error: "Invalid email address" });
   }
 
-  const users = readUsers();
+  const users = await readUsers();
   if (users.some((u) => normalizeEmail(u.email) === email)) {
     return res.status(409).json({ error: "Email already registered" });
   }
@@ -445,8 +501,8 @@ app.post("/api/auth/register", async (req, res) => {
     createdAt: new Date().toISOString()
   };
   users.push(user);
-  writeUsers(users);
-  createUserSession(res, user.id);
+  await writeUsers(users);
+  await createUserSession(res, user.id);
   return res.json({ ok: true, user: publicUser(user) });
 });
 
@@ -457,32 +513,32 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
-  const user = readUsers().find((u) => normalizeEmail(u.email) === email);
+  const user = (await readUsers()).find((u) => normalizeEmail(u.email) === email);
   if (!user) return res.status(401).json({ error: "Invalid email or password" });
 
   const valid = await bcrypt.compare(password, String(user.passwordHash || ""));
   if (!valid) return res.status(401).json({ error: "Invalid email or password" });
 
-  createUserSession(res, user.id);
+  await createUserSession(res, user.id);
   return res.json({ ok: true, user: publicUser(user) });
 });
 
-app.post("/api/auth/logout", (req, res) => {
+app.post("/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req.headers.cookie || "");
-  clearUserSession(res, cookies.tp_user);
+  await clearUserSession(res, cookies.tp_user);
   return res.json({ ok: true });
 });
 
-app.get("/api/auth/me", (req, res) => {
-  const userId = getUserId(req);
+app.get("/api/auth/me", async (req, res) => {
+  const userId = await getUserId(req);
   if (!userId) return res.json({ ok: true, authed: false, user: null });
-  const user = readUsers().find((u) => String(u.id) === String(userId));
+  const user = (await readUsers()).find((u) => String(u.id) === String(userId));
   if (!user) return res.json({ ok: true, authed: false, user: null });
   return res.json({ ok: true, authed: true, user: publicUser(user) });
 });
 
 // --- Orders: pending until user confirms purchase manually ---
-app.post("/api/orders", requireUser, (req, res) => {
+app.post("/api/orders", requireUser, async (req, res) => {
   const items = normalizeOrderItems(req.body?.items);
   if (!items) return res.status(400).json({ error: "Invalid order items" });
 
@@ -510,29 +566,29 @@ app.post("/api/orders", requireUser, (req, res) => {
     confirmedAt: null
   };
 
-  const orders = readOrders();
+  const orders = await readOrders();
   orders.unshift(order);
-  writeOrders(orders);
+  await writeOrders(orders);
   return res.json({ ok: true, order });
 });
 
-app.get("/api/orders/pending", requireUser, (req, res) => {
-  const pending = readOrders().filter(
+app.get("/api/orders/pending", requireUser, async (req, res) => {
+  const pending = (await readOrders()).filter(
     (o) => String(o.userId) === String(req.userId) && o.status === "pending"
   );
   return res.json({ ok: true, orders: pending });
 });
 
-app.get("/api/orders/history", requireUser, (req, res) => {
-  const history = readOrders().filter(
+app.get("/api/orders/history", requireUser, async (req, res) => {
+  const history = (await readOrders()).filter(
     (o) => String(o.userId) === String(req.userId) && o.status === "confirmed"
   );
   return res.json({ ok: true, orders: history });
 });
 
-app.post("/api/orders/:id/confirm", requireUser, (req, res) => {
+app.post("/api/orders/:id/confirm", requireUser, async (req, res) => {
   const orderId = String(req.params.id || "");
-  const orders = readOrders();
+  const orders = await readOrders();
   const index = orders.findIndex(
     (o) => String(o.id) === orderId && String(o.userId) === String(req.userId)
   );
@@ -546,7 +602,7 @@ app.post("/api/orders/:id/confirm", requireUser, (req, res) => {
     status: "confirmed",
     confirmedAt: new Date().toISOString()
   };
-  writeOrders(orders);
+  await writeOrders(orders);
   return res.json({ ok: true, order: orders[index] });
 });
 
@@ -567,6 +623,10 @@ app.get("/sitemap.xml", (_req, res) => {
   res.type("application/xml").send(xml);
 });
 
+app.get("/healthz", (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.use("/uploads", express.static(STORAGE_UPLOADS, { fallthrough: false, maxAge: "7d" }));
 
 app.use(express.static(PUBLIC, { extensions: ["html"] }));
@@ -574,8 +634,8 @@ app.use(express.static(PUBLIC, { extensions: ["html"] }));
 // Vercel attend généralement un export de l'app Express (au lieu d'app.listen).
 // On écoute uniquement quand on exécute `node server.js` en local.
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`TradePlug255 running on http://localhost:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`TradePlug255 running on http://${HOST}:${PORT}`);
   });
 }
 
