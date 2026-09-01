@@ -1,7 +1,7 @@
 /**
  * TradePlug255 — catalog, cart, WhatsApp checkout
  */
-const SEGMENTS = {
+const SEGMENTS_FALLBACK = {
   telephones: {
     title: "Phones",
     tagline: "Smartphones",
@@ -42,9 +42,91 @@ const SEGMENTS = {
     tagline: "Adults only",
     lead: "Category reserved for people aged 18 and over.",
     api: "/api/products/restreints",
-    emoji: "🔞"
+    emoji: "🔞",
+    restricted: true
   }
 };
+
+let storeCategories = [];
+
+function getSegmentFromPath() {
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("c");
+  if (fromQuery) return fromQuery.trim();
+
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  if (parts.length === 1) {
+    const slug = parts[0];
+    if (slug === "catalog") return "";
+    if (["admin", "api", "uploads", "produits", "premium", "contact", "profile", "images", "data", "p"].includes(slug)) {
+      return "";
+    }
+    return slug;
+  }
+  return "";
+}
+
+function categoryToSegment(category) {
+  return {
+    title: category.name,
+    tagline: category.tagline || category.name,
+    lead: category.lead || "",
+    api: `/api/products/${category.id}`,
+    emoji: category.emoji || "📦",
+    restricted: Boolean(category.restricted),
+    id: category.id
+  };
+}
+
+async function fetchStoreCategories() {
+  try {
+    const data = await fetchJson("/api/categories");
+    const list = Array.isArray(data?.categories) ? data.categories : [];
+    if (list.length) {
+      storeCategories = list;
+      return list;
+    }
+  } catch {
+    /* fallback below */
+  }
+  storeCategories = Object.entries(SEGMENTS_FALLBACK).map(([id, meta]) => ({
+    id,
+    name: meta.title,
+    tagline: meta.tagline,
+    lead: meta.lead,
+    emoji: meta.emoji,
+    restricted: Boolean(meta.restricted)
+  }));
+  return storeCategories;
+}
+
+function renderCategoryGrid(container, categories) {
+  if (!container) return;
+  const visible = categories.filter((c) => !c.restricted);
+  const restricted = categories.filter((c) => c.restricted);
+
+  const cards = visible
+    .map(
+      (c) => `<a href="/${escapeHtml(c.id)}/" class="universe-card">
+        <div class="universe-card__icon" aria-hidden="true">${escapeHtml(c.emoji || "📦")}</div>
+        <strong>${escapeHtml(c.name)}</strong>
+        <p>${escapeHtml(c.lead || c.tagline || "")}</p>
+      </a>`
+    )
+    .join("");
+
+  const restrictedCards = restricted
+    .map(
+      (c) => `<a href="/${escapeHtml(c.id)}/" class="universe-card universe-card--restricted" data-age-gate-link aria-label="${escapeHtml(c.name)}">
+        <div class="universe-card__icon" aria-hidden="true">${escapeHtml(c.emoji || "🔞")}</div>
+        <strong>${escapeHtml(c.name)}</strong>
+        <p>${escapeHtml(c.lead || c.tagline || "")}</p>
+      </a>`
+    )
+    .join("");
+
+  container.innerHTML = cards + restrictedCards;
+}
 
 const AGE_GATE_KEY = "tradeplug255-age-verified";
 
@@ -58,7 +140,7 @@ const NO_IMAGE =
 let site = {
   shopName: "TradePlug255",
   currencySymbol: "TZS",
-  whatsappSeller: "+25574879462"
+  whatsappSeller: "+255748794762"
 };
 let products = [];
 let cart = [];
@@ -70,8 +152,9 @@ const isProduits = body.classList.contains("page-produits");
 const isPremium = body.classList.contains("page-premium");
 const isContact = body.classList.contains("page-contact");
 const isProfile = body.classList.contains("page-profile");
-const segmentKey = body.dataset.segment || "";
-const segment = SEGMENTS[segmentKey] || null;
+const isProductPage = body.classList.contains("page-product");
+const segmentKey = body.dataset.segment || getSegmentFromPath();
+let segment = null;
 const requiresAge = body.dataset.requireAge === "true";
 
 const productListEl = document.getElementById("productList");
@@ -101,6 +184,27 @@ const orderCityInputEl = document.getElementById("orderCityInput");
 const orderAddressInputEl = document.getElementById("orderAddressInput");
 const orderNotesInputEl = document.getElementById("orderNotesInput");
 
+function slugifyProductName(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "product";
+}
+
+function productPagePath(product, seg) {
+  const s = seg || segmentKey || body.dataset.segment || "";
+  const slug = product.slug || slugifyProductName(product.name);
+  return `/p/${s}/${product.id}/${slug}`;
+}
+
+function productAbsoluteUrl(product, seg) {
+  return `${window.location.origin}${productPagePath(product, seg)}`;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -116,6 +220,53 @@ function toDigits(phone) {
 function formatPrice(amount, symbol) {
   const s = symbol || site.currencySymbol || "TZS";
   return `${Number(amount).toLocaleString("en-US")} ${s}`;
+}
+
+function parseProductPrice(raw) {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return { kind: "number", value: raw };
+  }
+  const text = String(raw ?? "").trim();
+  if (!text) return { kind: "empty" };
+  if (/[a-zA-Z]/.test(text) || text.includes("\n")) {
+    return { kind: "text", value: text };
+  }
+  const num = Number(text.replace(/,/g, ""));
+  if (Number.isFinite(num) && num >= 0) return { kind: "number", value: num };
+  return { kind: "text", value: text };
+}
+
+function getNumericProductPrice(product) {
+  const parsed = parseProductPrice(product?.price);
+  return parsed.kind === "number" ? parsed.value : null;
+}
+
+function formatProductPrice(product) {
+  const parsed = parseProductPrice(product?.price);
+  if (parsed.kind === "number") return formatPrice(parsed.value, product?.currencySymbol);
+  if (parsed.kind === "text") return parsed.value;
+  return "—";
+}
+
+function formatProductPriceHtml(product) {
+  const parsed = parseProductPrice(product?.price);
+  if (parsed.kind === "number") {
+    return escapeHtml(formatPrice(parsed.value, product?.currencySymbol));
+  }
+  if (parsed.kind === "text") {
+    return escapeHtml(parsed.value).replace(/\n/g, "<br>");
+  }
+  return "—";
+}
+
+function formatCartItemPrice(item) {
+  return formatProductPrice(item);
+}
+
+function getCartLineTotal(item) {
+  const parsed = parseProductPrice(item?.price);
+  if (parsed.kind !== "number") return null;
+  return parsed.value * item.qty;
 }
 
 function getProductImages(product) {
@@ -226,8 +377,12 @@ function setStatus(message, ok) {
   }
 }
 
-async function fetchJson(url) {
-  const res = await fetch(url, { cache: "no-store" });
+async function fetchJson(url, options = {}) {
+  const res = await fetch(url, {
+    cache: "no-store",
+    credentials: "include",
+    ...options
+  });
   if (!res.ok) throw new Error(`Request failed (${res.status})`);
   return res.json();
 }
@@ -236,6 +391,7 @@ async function postJson(url, payload) {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(payload ?? {})
   });
   const data = await res.json().catch(() => ({}));
@@ -250,6 +406,12 @@ async function refreshAuth() {
   } catch {
     currentUser = null;
   }
+  if (!currentUser && cart.length) {
+    cart = [];
+    saveCart();
+  } else {
+    paintCartUi();
+  }
   return currentUser;
 }
 
@@ -262,10 +424,11 @@ function getRedirectUrl() {
   return null;
 }
 
-async function requireLoginForCheckout() {
+async function requireLoginForCart() {
   if (!currentUser) await refreshAuth();
   if (currentUser) return true;
   const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+  setStatus("Sign in to use the cart.", false);
   window.location.href = `/profile/?redirect=${redirect}`;
   return false;
 }
@@ -295,7 +458,7 @@ function orderItemsFromProduct(product) {
 }
 
 async function reserveAndOpenWhatsApp(items, orderInfo, message, segment) {
-  if (!(await requireLoginForCheckout())) return;
+  if (!(await requireLoginForCart())) return;
   await createPendingOrder(items, orderInfo, segment || segmentKey || "");
   openWhatsApp(message);
   setStatus("Reservation saved. Confirm your purchase in My account after WhatsApp.", true);
@@ -318,14 +481,25 @@ async function handleCartCheckout() {
   }
 }
 
-async function handleProductOrder(product) {
+function handleProductOrder(product) {
   const orderInfo = getOrderInfo();
   const message = buildProductWhatsAppMessage(product, orderInfo);
-  try {
-    await reserveAndOpenWhatsApp(orderItemsFromProduct(product), orderInfo, message, segmentKey);
-  } catch (err) {
-    setStatus(err.message || "Could not save reservation.", false);
-  }
+  openWhatsApp(message);
+}
+
+function injectNavAccountLink() {
+  document.querySelectorAll(".site-nav").forEach((nav) => {
+    let link = nav.querySelector("[data-nav-account]");
+    if (!link) {
+      link = document.createElement("a");
+      link.href = "/profile/";
+      link.setAttribute("data-nav-account", "true");
+      const contact = nav.querySelector('a[href="/contact/"]');
+      if (contact) nav.insertBefore(link, contact);
+      else nav.appendChild(link);
+    }
+    link.textContent = currentUser ? "My account" : "Sign in";
+  });
 }
 
 function injectProfileLink() {
@@ -335,14 +509,15 @@ function injectProfileLink() {
   link.href = "/profile/";
   link.className = "btn btn--ghost btn--block profile-cart-link";
   link.setAttribute("data-profile-link", "true");
-  link.textContent = currentUser ? "My account" : "Sign in / My account";
+  link.textContent = currentUser ? "My account" : "Sign in for cart";
   foot.insertBefore(link, foot.firstChild);
 }
 
 function updateProfileLink() {
+  injectNavAccountLink();
   const link = document.querySelector("[data-profile-link]");
   if (link) {
-    link.textContent = currentUser ? "My account" : "Sign in / My account";
+    link.textContent = currentUser ? "My account" : "Sign in for cart";
   } else {
     injectProfileLink();
   }
@@ -377,6 +552,10 @@ function removeFromCart(id) {
 }
 
 function addToCart(product) {
+  if (!currentUser) {
+    requireLoginForCart();
+    return;
+  }
   const existing = cart.find((entry) => entry.id === product.id);
   if (existing) existing.qty += 1;
   else {
@@ -408,14 +587,17 @@ function paintCartUi() {
   }
 
   let total = 0;
+  let hasVariantPrices = false;
   for (const item of cart) {
-    total += item.price * item.qty;
+    const lineTotal = getCartLineTotal(item);
+    if (lineTotal === null) hasVariantPrices = true;
+    else total += lineTotal;
     const row = document.createElement("div");
     row.className = "cart-item";
     row.innerHTML = `
       <div class="cart-item__info">
         <p class="cart-item__name">${escapeHtml(item.name)}</p>
-        <p class="cart-item__price">${formatPrice(item.price, item.currencySymbol)}</p>
+        <p class="cart-item__price">${escapeHtml(formatCartItemPrice(item))}</p>
         <div class="cart-item__qty">
           <button type="button" data-cart-minus="${escapeHtml(item.id)}" aria-label="Decrease quantity">−</button>
           <span>${item.qty}</span>
@@ -426,7 +608,13 @@ function paintCartUi() {
     cartListEl.appendChild(row);
   }
 
-  if (cartTotalEl) cartTotalEl.textContent = formatPrice(total);
+  if (cartTotalEl) {
+    cartTotalEl.textContent = hasVariantPrices
+      ? total > 0
+        ? `${formatPrice(total)} + variant prices`
+        : "See variant prices"
+      : formatPrice(total);
+  }
   updateProfileLink();
 
   cartListEl.querySelectorAll("[data-cart-minus]").forEach((btn) => {
@@ -442,6 +630,10 @@ function paintCartUi() {
 
 function openCartDrawer() {
   if (!cartDrawerEl) return;
+  if (!currentUser) {
+    requireLoginForCart();
+    return;
+  }
   cartDrawerEl.hidden = false;
   document.body.style.overflow = "hidden";
 }
@@ -498,10 +690,11 @@ function buildProductWhatsAppMessage(product, orderInfo) {
     `I want to order:`,
     "",
     `*${product.name}*`,
-    `Price: ${formatPrice(product.price, product.currencySymbol)}`,
+    `Price: ${formatProductPrice(product)}`,
   ];
 
   if (product.condition) lines.push(`Condition: ${product.condition}`);
+  lines.push(`Link: ${productAbsoluteUrl(product)}`);
 
   appendShippingAndOrderInfo(lines, orderInfo);
   lines.push("", "Thank you!");
@@ -513,12 +706,27 @@ function buildCartWhatsAppMessage(orderInfo) {
   const lines = [`Hello ${shop},`, "", "I want to order:", ""];
 
   let total = 0;
+  let hasVariantPrices = false;
   for (const item of cart) {
-    lines.push(`• ${item.name} x${item.qty} — ${formatPrice(item.price * item.qty, item.currencySymbol)}`);
-    total += item.price * item.qty;
+    const lineLabel = formatCartItemPrice(item);
+    const lineTotal = getCartLineTotal(item);
+    if (lineTotal === null) {
+      hasVariantPrices = true;
+      lines.push(`• ${item.name} x${item.qty} — ${lineLabel}`);
+    } else {
+      lines.push(`• ${item.name} x${item.qty} — ${formatPrice(lineTotal, item.currencySymbol)}`);
+      total += lineTotal;
+    }
   }
 
-  lines.push("", `*Total: ${formatPrice(total)}*`);
+  if (hasVariantPrices) {
+    lines.push("", "*Some items have storage/model variants — confirm the exact option with us.*");
+  }
+  if (total > 0) {
+    lines.push("", `*Subtotal (fixed prices): ${formatPrice(total)}*`);
+  } else if (!hasVariantPrices) {
+    lines.push("", `*Total: ${formatPrice(0)}*`);
+  }
   appendShippingAndOrderInfo(lines, orderInfo);
   lines.push("", "Thank you!");
   return lines.join("\n");
@@ -544,10 +752,31 @@ function getFilteredProducts() {
     );
   }
   if (Number.isFinite(max) && max > 0) {
-    list = list.filter((product) => Number(product.price) <= max);
+    list = list.filter((product) => {
+      const numeric = getNumericProductPrice(product);
+      return numeric === null || numeric <= max;
+    });
   }
-  if (sort === "asc") list.sort((a, b) => Number(a.price) - Number(b.price));
-  if (sort === "desc") list.sort((a, b) => Number(b.price) - Number(a.price));
+  if (sort === "asc") {
+    list.sort((a, b) => {
+      const aPrice = getNumericProductPrice(a);
+      const bPrice = getNumericProductPrice(b);
+      if (aPrice === null && bPrice === null) return 0;
+      if (aPrice === null) return 1;
+      if (bPrice === null) return -1;
+      return aPrice - bPrice;
+    });
+  }
+  if (sort === "desc") {
+    list.sort((a, b) => {
+      const aPrice = getNumericProductPrice(a);
+      const bPrice = getNumericProductPrice(b);
+      if (aPrice === null && bPrice === null) return 0;
+      if (aPrice === null) return 1;
+      if (bPrice === null) return -1;
+      return bPrice - aPrice;
+    });
+  }
   return list;
 }
 
@@ -564,9 +793,11 @@ function renderProducts() {
   for (const product of list) {
     const images = getProductImages(product);
     const img = images[0] || "";
+    const pageHref = productPagePath(product);
     const card = document.createElement("article");
     card.className = "product-card";
     card.innerHTML = `
+      <a href="${escapeHtml(pageHref)}" class="product-card__link" aria-label="View ${escapeHtml(product.name)}">
       <div class="product-card__media${img ? " product-card__media--zoomable" : ""}">
         ${
           img
@@ -577,12 +808,14 @@ function renderProducts() {
             : `<span class="product-card__placeholder">${segment?.emoji || "📦"}<br/>Image coming soon</span>`
         }
       </div>
+      </a>
       <div class="product-card__body">
         ${product.condition ? `<span class="product-card__condition">${escapeHtml(product.condition)}</span>` : ""}
-        <h3 class="product-card__name">${escapeHtml(product.name)}</h3>
+        <h3 class="product-card__name"><a href="${escapeHtml(pageHref)}">${escapeHtml(product.name)}</a></h3>
         <p class="product-card__desc">${escapeHtml(product.description || "")}</p>
-        <p class="product-card__price">${formatPrice(product.price, product.currencySymbol)}</p>
+        <p class="product-card__price product-card__price--variants">${formatProductPriceHtml(product)}</p>
         <div class="product-card__actions">
+          <a href="${escapeHtml(pageHref)}" class="btn btn--primary">View product</a>
           <button type="button" class="btn btn--outline" data-add-cart="${escapeHtml(product.id)}">Add to cart</button>
           <button type="button" class="btn btn--whatsapp" data-order-wa="${escapeHtml(product.id)}">Order now</button>
         </div>
@@ -607,7 +840,9 @@ function renderProducts() {
     });
   });
   productListEl.querySelectorAll("[data-zoom-product]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const product = products.find((entry) => entry.id === btn.getAttribute("data-zoom-product"));
       if (!product) return;
       const images = getProductImages(product);
@@ -629,7 +864,9 @@ function bindUi() {
     setStatus("Filters reset.", true);
   });
 
-  cartToggleBtnEl?.addEventListener("click", openCartDrawer);
+  cartToggleBtnEl?.addEventListener("click", () => {
+    openCartDrawer();
+  });
   cartCloseBtnEl?.addEventListener("click", closeCartDrawer);
   cartBackdropEl?.addEventListener("click", closeCartDrawer);
 
@@ -645,11 +882,13 @@ function bindUi() {
     handleCartCheckout();
   });
 
-  waFloatEl?.addEventListener("click", (e) => {
+  waFloatEl?.addEventListener("click", async (e) => {
     e.preventDefault();
-    const msg = cart.length
-      ? buildCartWhatsAppMessage(getOrderInfo())
-      : `Hello ${site.shopName},\n\nI would like more information about your products.\n\nThank you!`;
+    if (cart.length) {
+      await handleCartCheckout();
+      return;
+    }
+    const msg = `Hello ${site.shopName},\n\nI would like more information about your products.\n\nThank you!`;
     openWhatsApp(msg);
   });
 
@@ -664,11 +903,16 @@ function bindUi() {
 }
 
 async function initHub() {
-  const siteData = await fetchJson("/data/site.json");
+  const [siteData, categories] = await Promise.all([
+    fetchJson("/data/site.json"),
+    fetchStoreCategories()
+  ]);
   site = { ...site, ...siteData };
   const brandName = document.querySelector(".brand__name");
   if (brandName) brandName.textContent = site.shopName;
   applySocialLinks("homeSocialLinks", site.social);
+  renderCategoryGrid(document.getElementById("categoryGrid"), categories);
+  bindAgeGate();
 }
 
 function applySocialLinks(containerId, social) {
@@ -817,6 +1061,14 @@ function bindAgeGate() {
   });
 }
 
+function formatOrderItemPrice(item) {
+  if (typeof item?.price === "number" && Number.isFinite(item.price)) {
+    return formatPrice(item.price * item.qty, item.currencySymbol);
+  }
+  const label = formatProductPrice(item);
+  return `${label} × ${item.qty}`;
+}
+
 function formatOrderDate(value) {
   if (!value) return "—";
   try {
@@ -833,7 +1085,7 @@ function renderOrderCard(order, { showConfirm = false } = {}) {
   const itemsHtml = (order.items || [])
     .map(
       (item) =>
-        `<li>${escapeHtml(item.name)} × ${item.qty} — ${formatPrice(item.price * item.qty, item.currencySymbol)}</li>`
+        `<li>${escapeHtml(item.name)} — ${escapeHtml(formatOrderItemPrice(item))}</li>`
     )
     .join("");
   const info = order.orderInfo || {};
@@ -973,6 +1225,8 @@ async function initProfile() {
     try {
       await postJson("/api/auth/logout", {});
       currentUser = null;
+      cart = [];
+      saveCart();
       showProfileGuest();
       setStatus("Signed out.", true);
     } catch (err) {
@@ -989,12 +1243,28 @@ async function initProfile() {
   }
 }
 
-function initProduits() {
+async function initProduits() {
+  const categories = await fetchStoreCategories();
+  renderCategoryGrid(document.getElementById("categoryGrid"), categories);
   bindAgeGate();
 }
 
 async function initCatalog() {
-  if (!segment) return;
+  if (!segmentKey) return;
+  const categories = await fetchStoreCategories();
+  const category = categories.find((c) => c.id === segmentKey);
+  if (!category) {
+    const fallback = SEGMENTS_FALLBACK[segmentKey];
+    if (!fallback) return;
+    segment = { ...fallback, id: segmentKey };
+  } else {
+    segment = categoryToSegment(category);
+  }
+
+  if ((requiresAge || segment.restricted) && !isAgeVerified()) {
+    showAgeGate();
+  }
+
   const [siteData, data] = await Promise.all([
     fetchJson("/data/site.json"),
     fetchJson(segment.api)
@@ -1016,15 +1286,24 @@ async function initCatalog() {
 loadCart();
 bindUi();
 bindAgeGate();
+injectNavAccountLink();
 injectProfileLink();
 refreshAuth().then(() => updateProfileLink());
 paintCartUi();
+
+window.addEventListener("tradeplug:add-cart", async (event) => {
+  const product = event.detail?.product;
+  if (!product) return;
+  if (!(await requireLoginForCart())) return;
+  addToCart(product);
+});
 
 let boot;
 if (isHub) boot = initHub();
 else if (isPremium) boot = initPremium();
 else if (isContact) boot = initContact();
 else if (isProfile) boot = initProfile();
-else if (isProduits) boot = Promise.resolve(initProduits());
-else boot = initCatalog();
-boot.catch((err) => setStatus(err.message || "Loading error", false));
+else if (isProductPage) boot = refreshAuth().then(() => updateProfileLink());
+else if (isProduits) boot = initProduits();
+else if (segmentKey) boot = initCatalog();
+boot?.catch?.((err) => setStatus(err.message || "Loading error", false));

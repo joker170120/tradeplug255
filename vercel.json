@@ -1,17 +1,54 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 60
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/index.html",
+      "statusCode": 308
+    },
+    {
+      "has": [{ "type": "host", "value": "tradeplug255.vercel.app" }],
+      "source": "/:path*",
+      "destination": "https://tradeplug255.com/:path*",
+      "permanent": true
     }
-  },
+  ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/admin", "destination": "/api" },
-    { "source": "/admin/(.*)", "destination": "/api" },
-    { "source": "/uploads/(.*)", "destination": "/api" },
-    { "source": "/robots.txt", "destination": "/api" },
-    { "source": "/sitemap.xml", "destination": "/api" },
-    { "source": "/healthz", "destination": "/api" }
+    {
+      "source": "/uploads/:path*",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/uploads/:path*"
+    },
+    {
+      "source": "/data/:path*",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/data/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/api/:path*"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/admin/:path*"
+    },
+    {
+      "source": "/healthz",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/healthz"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/sitemap.xml"
+    },
+    {
+      "source": "/p/:path*",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/p/:path*"
+    },
+    {
+      "source": "/:segment",
+      "destination": "http://tradeplug255.167.233.117.168.sslip.io/:segment"
+    }
   ]
 }

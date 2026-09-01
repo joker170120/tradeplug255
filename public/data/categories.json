@@ -1,0 +1,56 @@
+[
+  {
+    "id": "telephones",
+    "name": "Phones",
+    "tagline": "Smartphones",
+    "lead": "iPhone, Samsung, Pixel and more — new or certified refurbished.",
+    "emoji": "📱",
+    "restricted": false,
+    "sortOrder": 0
+  },
+  {
+    "id": "laptops",
+    "name": "Laptops",
+    "tagline": "Portable computers",
+    "lead": "MacBook, office and gaming laptops — performance with style.",
+    "emoji": "💻",
+    "restricted": false,
+    "sortOrder": 1
+  },
+  {
+    "id": "tablettes",
+    "name": "iPad & Tablets",
+    "tagline": "Tablets",
+    "lead": "iPad, Samsung Tab and related accessories.",
+    "emoji": "📲",
+    "restricted": false,
+    "sortOrder": 2
+  },
+  {
+    "id": "jeux-video",
+    "name": "Gaming",
+    "tagline": "Consoles & games",
+    "lead": "PlayStation, Xbox, Nintendo and top games at the best price.",
+    "emoji": "🎮",
+    "restricted": false,
+    "sortOrder": 3
+  },
+  {
+    "id": "accessoires",
+    "name": "Accessories",
+    "tagline": "Audio & protection",
+    "lead": "Earbuds, chargers, cases and more.",
+    "emoji": "🎧",
+    "restricted": false,
+    "sortOrder": 4
+  },
+  {
+    "id": "restreints",
+    "name": "Restricted products (+18)",
+    "tagline": "Adults only",
+    "lead": "Category reserved for people aged 18 and over.",
+    "emoji": "🔞",
+    "restricted": true,
+    "sortOrder": 5
+  }
+]

@@ -12,19 +12,162 @@ const productTableWrap = document.getElementById("productTableWrap");
 const statusEl = document.getElementById("status");
 const resetBtn = document.getElementById("resetBtn");
 const refreshBtn = document.getElementById("refreshBtn");
+const refreshUsersBtn = document.getElementById("refreshUsersBtn");
+const usersTableWrap = document.getElementById("usersTableWrap");
+const usersCountEl = document.getElementById("usersCount");
 const logoutBtn = document.getElementById("logoutBtn");
 
-const SEGMENT_LABELS = {
-  telephones: "Phones",
-  laptops: "Laptops",
-  tablettes: "iPad & Tablets",
-  "jeux-video": "Gaming",
-  accessoires: "Accessories",
-  restreints: "Restricted products (+18)"
-};
+const categoryForm = document.getElementById("categoryForm");
+const categoryIdInput = document.getElementById("categoryId");
+const categoryNameInput = document.getElementById("categoryNameInput");
+const categoryEmojiInput = document.getElementById("categoryEmojiInput");
+const categoryTaglineInput = document.getElementById("categoryTaglineInput");
+const categoryLeadInput = document.getElementById("categoryLeadInput");
+const categoryRestrictedInput = document.getElementById("categoryRestrictedInput");
+const categoryStatusEl = document.getElementById("categoryStatus");
+const categoryTableWrap = document.getElementById("categoryTableWrap");
+const resetCategoryBtn = document.getElementById("resetCategoryBtn");
+
+let adminCategories = [];
+
+function setCategoryStatus(msg, ok) {
+  if (!categoryStatusEl) return;
+  categoryStatusEl.textContent = msg || "";
+  categoryStatusEl.className = "admin-status" + (msg ? (ok ? " is-ok" : " is-err") : "");
+}
 
 function segmentLabel(key) {
-  return SEGMENT_LABELS[key] || key;
+  const cat = adminCategories.find((c) => c.id === key);
+  return cat ? cat.name : key;
+}
+
+function populateCategorySelects(categories, selectedId) {
+  const options = categories
+    .map(
+      (c) =>
+        `<option value="${escapeHtml(c.id)}"${c.id === selectedId ? " selected" : ""}>${escapeHtml(c.name)}${c.restricted ? " (+18)" : ""}</option>`
+    )
+    .join("");
+  const html = options || '<option value="">No categories yet</option>';
+  if (segmentInput) segmentInput.innerHTML = html;
+  if (listSegmentInput) listSegmentInput.innerHTML = html;
+  if (selectedId && listSegmentInput) listSegmentInput.value = selectedId;
+  if (selectedId && segmentInput) segmentInput.value = selectedId;
+}
+
+function resetCategoryForm() {
+  if (!categoryForm) return;
+  categoryIdInput.value = "";
+  categoryForm.reset();
+  categoryRestrictedInput.value = "false";
+  setCategoryStatus("");
+}
+
+function fillCategoryForm(category) {
+  categoryIdInput.value = category.id;
+  categoryNameInput.value = category.name || "";
+  categoryEmojiInput.value = category.emoji || "📦";
+  categoryTaglineInput.value = category.tagline || "";
+  categoryLeadInput.value = category.lead || "";
+  categoryRestrictedInput.value = category.restricted ? "true" : "false";
+  setCategoryStatus(`Editing: ${category.name}`, true);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderCategoryTable(categories) {
+  if (!categoryTableWrap) return;
+  if (!categories.length) {
+    categoryTableWrap.innerHTML = '<p class="empty-state">No categories yet. Create one above.</p>';
+    return;
+  }
+  const rows = categories
+    .map(
+      (c) => `<tr>
+        <td>${escapeHtml(c.emoji || "📦")}</td>
+        <td><strong>${escapeHtml(c.name)}</strong><br><small>/${escapeHtml(c.id)}/</small></td>
+        <td>${escapeHtml(c.tagline || "—")}</td>
+        <td>${c.productCount ?? 0}</td>
+        <td>${c.restricted ? "Yes" : "No"}</td>
+        <td class="admin-row-actions">
+          <button class="btn btn--outline" type="button" data-edit-category="${escapeHtml(c.id)}">Edit</button>
+          <button class="btn btn--ghost" type="button" data-delete-category="${escapeHtml(c.id)}">Delete</button>
+        </td>
+      </tr>`
+    )
+    .join("");
+
+  categoryTableWrap.innerHTML = `
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr><th></th><th>Category</th><th>Tagline</th><th>Products</th><th>+18</th><th>Actions</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  categoryTableWrap.querySelectorAll("[data-edit-category]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-edit-category");
+      const category = adminCategories.find((c) => c.id === id);
+      if (category) fillCategoryForm(category);
+    });
+  });
+
+  categoryTableWrap.querySelectorAll("[data-delete-category]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-delete-category");
+      const category = adminCategories.find((c) => c.id === id);
+      if (!confirm(`Delete category "${category?.name || id}"?`)) return;
+      try {
+        const res = await fetch("/api/admin/category", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Delete failed");
+        setCategoryStatus("Category deleted.", true);
+        resetCategoryForm();
+        await loadCategories();
+      } catch (err) {
+        setCategoryStatus(err?.message || "Delete failed.", false);
+      }
+    });
+  });
+}
+
+async function loadCategories() {
+  const res = await fetch("/api/admin/categories", {
+    credentials: "include",
+    cache: "no-store"
+  });
+  if (res.status === 401) {
+    window.location.replace("/admin/login.html");
+    return;
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Cannot load categories");
+  adminCategories = Array.isArray(data.categories) ? data.categories : [];
+  renderCategoryTable(adminCategories);
+  const current = listSegmentInput?.value || adminCategories[0]?.id || "";
+  populateCategorySelects(adminCategories, current);
+  if (current) {
+    await loadSegment(current);
+  } else if (productTableWrap) {
+    productTableWrap.innerHTML = '<p class="empty-state">Create a category first, then add products.</p>';
+  }
+}
+
+function formatAdminPrice(price, currencySymbol = "TZS") {
+  if (typeof price === "number" && Number.isFinite(price)) {
+    return `${Number(price).toLocaleString("en-US")} ${currencySymbol}`;
+  }
+  const text = String(price ?? "").trim();
+  if (!text) return "—";
+  const oneLine = text.split("\n")[0];
+  return text.includes("\n") ? `${oneLine}…` : oneLine;
 }
 
 let selectedKeepImages = [];
@@ -90,7 +233,8 @@ function fillForm(product, segment) {
   segmentInput.value = segment;
   nameInput.value = product.name || "";
   descriptionInput.value = product.description || "";
-  priceInput.value = Number(product.price || 0);
+  priceInput.value =
+    product.price === null || product.price === undefined ? "" : String(product.price);
   conditionInput.value = product.condition || "";
   selectedKeepImages = (Array.isArray(product.images) ? product.images : [product.image])
     .map(normalizeImageUrl)
@@ -114,7 +258,7 @@ function renderTable(segment, products) {
         <td>${image ? `<img src="${escapeHtml(image)}" alt="" class="admin-thumb">` : "—"}</td>
         <td><strong>${escapeHtml(p.name)}</strong><br><small>${escapeHtml(p.condition || "")}</small></td>
         <td>${escapeHtml(category)}</td>
-        <td>${Number(p.price || 0).toLocaleString("en-US")} ${escapeHtml(p.currencySymbol || "TZS")}</td>
+        <td>${escapeHtml(formatAdminPrice(p.price, p.currencySymbol || "TZS"))}</td>
         <td class="admin-row-actions">
           <button class="btn btn--outline" type="button" data-edit="${escapeHtml(p.id)}">Edit</button>
           <button class="btn btn--ghost" type="button" data-delete="${escapeHtml(p.id)}">Delete</button>
@@ -178,6 +322,92 @@ async function loadSegment(segment) {
   renderTable(segment, Array.isArray(data.products) ? data.products : []);
 }
 
+function formatUserDate(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
+  } catch {
+    return value;
+  }
+}
+
+function renderUsersTable(users) {
+  const total = users.length;
+  if (usersCountEl) {
+    usersCountEl.textContent = total === 1 ? "1 registered account" : `${total} registered accounts`;
+  }
+  if (!usersTableWrap) return;
+  if (!users.length) {
+    usersTableWrap.innerHTML = '<p class="empty-state">No customer accounts yet.</p>';
+    return;
+  }
+
+  const rows = users
+    .map(
+      (user, index) => `<tr>
+        <td>${index + 1}</td>
+        <td><strong>${escapeHtml(user.name)}</strong></td>
+        <td><a href="mailto:${escapeHtml(user.email)}">${escapeHtml(user.email)}</a></td>
+        <td>${escapeHtml(formatUserDate(user.createdAt))}</td>
+        <td class="admin-row-actions">
+          <button class="btn btn--ghost" type="button" data-delete-user="${escapeHtml(user.id)}">Delete</button>
+        </td>
+      </tr>`
+    )
+    .join("");
+
+  usersTableWrap.innerHTML = `
+    <div class="admin-table-scroll">
+      <table class="admin-table admin-table--users">
+        <thead>
+          <tr><th>#</th><th>Name</th><th>Email</th><th>Registered</th><th>Actions</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  usersTableWrap.querySelectorAll("[data-delete-user]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const userId = btn.getAttribute("data-delete-user");
+      const row = btn.closest("tr");
+      const email = row?.querySelector("a")?.textContent || "this account";
+      if (!confirm(`Delete account ${email}? This cannot be undone.`)) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+          method: "DELETE",
+          credentials: "include"
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Delete failed");
+        setStatus("Account deleted.", true);
+        await loadUsers();
+      } catch (err) {
+        setStatus(err?.message || "Delete failed.", false);
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+async function loadUsers() {
+  if (usersTableWrap) usersTableWrap.innerHTML = '<p class="empty-state">Loading accounts…</p>';
+  const res = await fetch("/api/admin/users", {
+    credentials: "include",
+    cache: "no-store"
+  });
+  if (res.status === 401) {
+    window.location.replace("/admin/login.html");
+    return;
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Cannot load accounts");
+  renderUsersTable(Array.isArray(data.users) ? data.users : []);
+}
+
 async function checkSession() {
   const res = await fetch("/api/admin/me", { credentials: "include", cache: "no-store" });
   const data = await res.json().catch(() => ({}));
@@ -213,6 +443,11 @@ form.addEventListener("submit", async (e) => {
       body: fd
     });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      setStatus("Session expired. Redirecting to login…", false);
+      window.location.replace("/admin/login.html");
+      return;
+    }
     if (!res.ok) throw new Error(data.error || "Save failed");
     setStatus("Product saved successfully.", true);
     const seg = segmentInput.value;
@@ -233,6 +468,15 @@ refreshBtn.addEventListener("click", async () => {
   }
 });
 
+refreshUsersBtn?.addEventListener("click", async () => {
+  try {
+    await loadUsers();
+    setStatus("Accounts list refreshed.", true);
+  } catch (err) {
+    setStatus(err?.message || "Could not refresh accounts.", false);
+  }
+});
+
 listSegmentInput.addEventListener("change", () => {
   resetForm();
   segmentInput.value = listSegmentInput.value;
@@ -246,8 +490,49 @@ logoutBtn.addEventListener("click", async () => {
   window.location.replace("/admin/login.html");
 });
 
+resetCategoryBtn?.addEventListener("click", resetCategoryForm);
+
+categoryForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  setCategoryStatus("Saving category…");
+  const payload = {
+    id: categoryIdInput.value || undefined,
+    name: categoryNameInput.value.trim(),
+    tagline: categoryTaglineInput.value.trim(),
+    lead: categoryLeadInput.value.trim(),
+    emoji: categoryEmojiInput.value.trim() || "📦",
+    restricted: categoryRestrictedInput.value === "true"
+  };
+  const isEdit = Boolean(categoryIdInput.value);
+  try {
+    const res = await fetch("/api/admin/category", {
+      method: isEdit ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(isEdit ? payload : { ...payload, id: undefined })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      window.location.replace("/admin/login.html");
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || "Save failed");
+    setCategoryStatus(isEdit ? "Category updated." : "Category created.", true);
+    resetCategoryForm();
+    await loadCategories();
+  } catch (err) {
+    setCategoryStatus(err?.message || "Save failed.", false);
+  }
+});
+
 (async () => {
   if (!(await checkSession())) return;
   resetForm();
-  await loadSegment(listSegmentInput.value);
+  resetCategoryForm();
+  try {
+    await loadCategories();
+    await loadUsers();
+  } catch (err) {
+    setStatus(err?.message || "Load failed.", false);
+  }
 })();

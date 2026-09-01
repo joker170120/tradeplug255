@@ -1,0 +1,51 @@
+# Production sur VPS Hetzner (réseau Traefik Coolify)
+services:
+  tradeplug255:
+    build: .
+    container_name: tradeplug255
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3080"
+      TRUST_PROXY: "1"
+      SITE_URL: https://tradeplug255.com
+      COOKIE_SECURE: "1"
+    volumes:
+      - ./storage:/app/storage
+    networks:
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.tradeplug255-gzip.compress=true
+      - traefik.http.middlewares.tradeplug255-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.tradeplug255-redirect.redirectscheme.permanent=true
+      - traefik.http.routers.tradeplug255-http.entryPoints=http
+      - traefik.http.routers.tradeplug255-http.rule=Host(`tradeplug255.com`) || Host(`www.tradeplug255.com`) || Host(`tradeplug255.167.233.117.168.sslip.io`)
+      - traefik.http.routers.tradeplug255-http.middlewares=tradeplug255-redirect
+      - traefik.http.routers.tradeplug255-http.service=tradeplug255-http
+      - traefik.http.routers.tradeplug255-https.entryPoints=https
+      - traefik.http.routers.tradeplug255-https.rule=Host(`tradeplug255.com`) || Host(`www.tradeplug255.com`) || Host(`tradeplug255.167.233.117.168.sslip.io`)
+      - traefik.http.routers.tradeplug255-https.middlewares=tradeplug255-gzip
+      - traefik.http.routers.tradeplug255-https.tls=true
+      - traefik.http.routers.tradeplug255-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.tradeplug255-https.service=tradeplug255-http
+      - traefik.http.services.tradeplug255-http.loadbalancer.server.port=3080
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3080/healthz',(r)=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+networks:
+  coolify:
+    external: true

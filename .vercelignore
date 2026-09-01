@@ -1,0 +1,17 @@
+.git
+.git/**
+node_modules
+node_modules/**
+.env
+.env.*
+!.env.example
+.vercel
+.DS_Store
+
+# Pas de serverless — admin + API sur Hetzner
+api/
+api/**
+
+# Catalogue + photos sur Hetzner uniquement
+storage/
+storage/**

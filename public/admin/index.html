@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TradePlug255 Admin</title>
-  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="/images/logo.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,10 +15,10 @@
   <header class="admin-topbar">
     <div class="container admin-topbar__inner">
       <div class="admin-brand">
-        <img src="/images/logo.svg" alt="" width="40" height="40">
+        <img src="/images/logo.png" alt="TradePlug255" class="admin-brand__logo">
         <div>
           <strong>TradePlug255 Admin</strong>
-          <p>Manage products and images</p>
+          <p>Manage products, images and registered accounts</p>
         </div>
       </div>
       <div class="admin-actions">
@@ -31,6 +31,47 @@
   <main class="container admin-main">
     <section class="panel admin-panel">
       <div class="panel__head">
+        <h2>Categories</h2>
+        <p>Create and manage product categories. New categories appear on the store automatically.</p>
+      </div>
+      <form id="categoryForm" class="admin-form">
+        <input id="categoryId" type="hidden">
+        <div class="admin-grid">
+          <label class="field">
+            <span class="field__label">Category name</span>
+            <input id="categoryNameInput" name="name" required placeholder="e.g. Smart Watches">
+          </label>
+          <label class="field">
+            <span class="field__label">Emoji</span>
+            <input id="categoryEmojiInput" name="emoji" placeholder="📦" maxlength="4">
+          </label>
+          <label class="field">
+            <span class="field__label">Tagline</span>
+            <input id="categoryTaglineInput" name="tagline" placeholder="Short label">
+          </label>
+          <label class="field">
+            <span class="field__label">Restricted (+18)</span>
+            <select id="categoryRestrictedInput" name="restricted">
+              <option value="false">No</option>
+              <option value="true">Yes — age gate required</option>
+            </select>
+          </label>
+          <label class="field admin-grid__full">
+            <span class="field__label">Description</span>
+            <textarea id="categoryLeadInput" name="lead" rows="2" placeholder="Shown on the category page"></textarea>
+          </label>
+        </div>
+        <div class="admin-form__actions">
+          <button class="btn btn--primary" type="submit">Save category</button>
+          <button id="resetCategoryBtn" class="btn btn--ghost" type="button">Reset</button>
+        </div>
+      </form>
+      <p id="categoryStatus" class="admin-status"></p>
+      <div id="categoryTableWrap" class="admin-table-wrap" style="margin-top:14px"></div>
+    </section>
+
+    <section class="panel admin-panel">
+      <div class="panel__head">
         <h2>Product form</h2>
         <p>Add a new product or edit an existing one.</p>
       </div>
@@ -40,12 +81,7 @@
           <label class="field">
             <span class="field__label">Category</span>
             <select id="segmentInput" name="segment" required>
-              <option value="telephones">Phones</option>
-              <option value="laptops">Laptops</option>
-              <option value="tablettes">iPad &amp; Tablets</option>
-              <option value="jeux-video">Gaming</option>
-              <option value="accessoires">Accessories</option>
-              <option value="restreints">Restricted products (+18)</option>
+              <option value="">Loading categories…</option>
             </select>
           </label>
           <label class="field">
@@ -60,9 +96,10 @@
             <span class="field__label">Description</span>
             <textarea id="descriptionInput" name="description" rows="4" placeholder="Short product description for the store" required></textarea>
           </label>
-          <label class="field">
-            <span class="field__label">Price (TZS)</span>
-            <input id="priceInput" name="price" type="number" min="0" step="1000" required>
+          <label class="field admin-grid__full">
+            <span class="field__label">Price</span>
+            <textarea id="priceInput" name="price" rows="4" placeholder="Single price: 2850000&#10;Or variants:&#10;64GB — 2,500,000 TZS&#10;128GB — 2,800,000 TZS&#10;256GB — 3,200,000 TZS" required></textarea>
+            <span class="field__hint">One fixed price (numbers only) or several lines with storage / model variants.</span>
           </label>
           <label class="field">
             <span class="field__label">Upload images</span>
@@ -91,17 +128,24 @@
         <label class="field" style="max-width:260px">
           <span class="field__label">Category</span>
           <select id="listSegmentInput">
-            <option value="telephones">Phones</option>
-            <option value="laptops">Laptops</option>
-            <option value="tablettes">iPad &amp; Tablets</option>
-            <option value="jeux-video">Gaming</option>
-            <option value="accessoires">Accessories</option>
-            <option value="restreints">Restricted products (+18)</option>
+            <option value="">Loading categories…</option>
           </select>
         </label>
         <button id="refreshBtn" class="btn btn--outline" type="button">Refresh</button>
       </div>
       <div id="productTableWrap" class="admin-table-wrap"></div>
+    </section>
+
+    <section class="panel admin-panel">
+      <div class="panel__head">
+        <h2>Registered accounts</h2>
+        <p>Customers who created an account for the cart. Names and emails only — passwords are never stored in plain text.</p>
+      </div>
+      <div class="admin-list-tools">
+        <p id="usersCount" class="admin-users-count">Loading accounts…</p>
+        <button id="refreshUsersBtn" class="btn btn--outline" type="button">Refresh</button>
+      </div>
+      <div id="usersTableWrap" class="admin-table-wrap"></div>
     </section>
   </main>
 

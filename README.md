@@ -10,7 +10,7 @@ TradePlug255 is an English online store for:
 - Restricted products (+18)
 
 Theme: black and gold premium style.
-WhatsApp order number: **+255 748 794 62**.
+WhatsApp order number: **+255 748 794 762**.
 
 ## Run locally
 
